@@ -92,6 +92,7 @@ const i18n = {
             alertMicPermission: '无法访问麦克风,请检查权限设置',
             alertRecordingInterrupted: '录音在锁屏期间被中断，请重新开始录制',
             alertStorageFull: '存储空间不足，无法保存录音数据',
+            alertStorageFullWithUsable: '存储空间不足，无法保存录音数据。\n\n当前片段仍可正常使用，但刷新页面后会丢失。',
             
             errorSpeechNotSupported: '不支持语音识别',
             errorSpeechServiceAbnormal: '识别服务异常，请重新开启',
@@ -149,6 +150,7 @@ const i18n = {
             alertMicPermission: 'Cannot access microphone, please check permissions',
             alertRecordingInterrupted: 'Recording interrupted during lock screen, please start again',
             alertStorageFull: 'Storage full, cannot save recording',
+            alertStorageFullWithUsable: 'Storage full, cannot save recording.\n\nCurrent segments can still be used, but will be lost after refresh.',
             
             errorSpeechNotSupported: 'Speech recognition not supported',
             errorSpeechServiceAbnormal: 'Recognition service error, please restart',
@@ -206,6 +208,7 @@ const i18n = {
             alertMicPermission: 'マイクにアクセスできません、権限を確認してください',
             alertRecordingInterrupted: 'ロック画面中に録音が中断されました、再開してください',
             alertStorageFull: 'ストレージ容量不足、録音を保存できません',
+            alertStorageFullWithUsable: 'ストレージ容量不足、録音を保存できません。\n\n現在のセグメントは使用できますが、ページを更新すると失われます。',
             
             errorSpeechNotSupported: '音声認識はサポートされていません',
             errorSpeechServiceAbnormal: '認識サービスエラー、再起動してください',
@@ -263,6 +266,7 @@ const i18n = {
             alertMicPermission: 'Impossible d\'accéder au microphone, vérifiez les autorisations',
             alertRecordingInterrupted: 'Enregistrement interrompu pendant le verrouillage, recommencez',
             alertStorageFull: 'Stockage plein, impossible d\'enregistrer',
+            alertStorageFullWithUsable: 'Stockage plein, impossible d\'enregistrer.\n\nLes segments actuels peuvent toujours être utilisés, mais seront perdus après l\'actualisation.',
             
             errorSpeechNotSupported: 'Reconnaissance vocale non supportée',
             errorSpeechServiceAbnormal: 'Erreur du service de reconnaissance, veuillez redémarrer',
@@ -320,6 +324,7 @@ const i18n = {
             alertMicPermission: 'Kein Mikrofonzugriff, bitte Berechtigungen prüfen',
             alertRecordingInterrupted: 'Aufnahme während Bildschirmsperre unterbrochen, bitte neu starten',
             alertStorageFull: 'Speicher voll, Aufnahme kann nicht gespeichert werden',
+            alertStorageFullWithUsable: 'Speicher voll, Aufnahme kann nicht gespeichert werden.\n\nAktuelle Segmente können weiterhin verwendet werden, gehen aber nach dem Aktualisieren verloren.',
             
             errorSpeechNotSupported: 'Spracherkennung nicht unterstützt',
             errorSpeechServiceAbnormal: 'Fehler im Erkennungsdienst, bitte neu starten',
@@ -377,6 +382,7 @@ const i18n = {
             alertMicPermission: 'No se puede acceder al micrófono, verifique los permisos',
             alertRecordingInterrupted: 'Grabación interrumpida durante bloqueo de pantalla, reinicie',
             alertStorageFull: 'Almacenamiento lleno, no se puede guardar',
+            alertStorageFullWithUsable: 'Almacenamiento lleno, no se puede guardar.\n\nLos segmentos actuales aún se pueden usar, pero se perderán después de actualizar.',
             
             errorSpeechNotSupported: 'Reconocimiento de voz no compatible',
             errorSpeechServiceAbnormal: 'Error del servicio de reconocimiento, reinicie',
@@ -434,6 +440,7 @@ const i18n = {
             alertMicPermission: '마이크에 접근할 수 없습니다, 권한을 확인해주세요',
             alertRecordingInterrupted: '화면 잠금 중 녹음이 중단되었습니다, 다시 시작해주세요',
             alertStorageFull: '저장 공간이 부족하여 녹음을 저장할 수 없습니다',
+            alertStorageFullWithUsable: '저장 공간이 부족하여 녹음을 저장할 수 없습니다.\n\n현재 세그먼트는 사용할 수 있지만 페이지를 새로 고침하면 손실됩니다.',
             
             errorSpeechNotSupported: '음성 인식이 지원되지 않습니다',
             errorSpeechServiceAbnormal: '인식 서비스 오류, 다시 시작해주세요',
@@ -491,6 +498,7 @@ const i18n = {
             alertMicPermission: 'Нет доступа к микрофону, проверьте разрешения',
             alertRecordingInterrupted: 'Запись прервана во время блокировки экрана, начните заново',
             alertStorageFull: 'Хранилище заполнено, невозможно сохранить запись',
+            alertStorageFullWithUsable: 'Хранилище заполнено, невозможно сохранить запись.\n\nТекущие сегменты все еще можно использовать, но они будут потеряны после обновления.',
             
             errorSpeechNotSupported: 'Распознавание речи не поддерживается',
             errorSpeechServiceAbnormal: 'Ошибка службы распознавания, перезапустите',
