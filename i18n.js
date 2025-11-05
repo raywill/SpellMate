@@ -80,7 +80,7 @@ const i18n = {
             commandPrevious: '上一个 - 播放上一个片段',
             
             settingsTitle: '高级设置',
-            settingSilence: '停顿阈值 (秒):',
+            settingSilence: '停顿阈值:',
             settingVolume: '音量阈值:',
             settingLanguage: '语言:',
             
@@ -140,7 +140,7 @@ const i18n = {
             commandPrevious: 'Previous - Play previous segment',
             
             settingsTitle: 'Advanced Settings',
-            settingSilence: 'Silence Threshold (sec):',
+            settingSilence: 'Silence Threshold:',
             settingVolume: 'Volume Threshold:',
             settingLanguage: 'Language:',
             
@@ -200,7 +200,7 @@ const i18n = {
             commandPrevious: '前 - 前のセグメントを再生',
             
             settingsTitle: '詳細設定',
-            settingSilence: '無音閾値 (秒):',
+            settingSilence: '無音閾値:',
             settingVolume: '音量閾値:',
             settingLanguage: '言語:',
             
@@ -260,7 +260,7 @@ const i18n = {
             commandPrevious: 'Précédent - Segment précédent',
             
             settingsTitle: 'Paramètres avancés',
-            settingSilence: 'Seuil de silence (sec):',
+            settingSilence: 'Seuil de silence:',
             settingVolume: 'Seuil de volume:',
             settingLanguage: 'Langue:',
             
@@ -320,7 +320,7 @@ const i18n = {
             commandPrevious: 'Zurück - Vorheriges Segment',
             
             settingsTitle: 'Erweiterte Einstellungen',
-            settingSilence: 'Pausenschwelle (Sek.):',
+            settingSilence: 'Pausenschwelle:',
             settingVolume: 'Lautstärkeschwelle:',
             settingLanguage: 'Sprache:',
             
@@ -380,7 +380,7 @@ const i18n = {
             commandPrevious: 'Anterior - Segmento anterior',
             
             settingsTitle: 'Configuración avanzada',
-            settingSilence: 'Umbral de silencio (seg.):',
+            settingSilence: 'Umbral de silencio:',
             settingVolume: 'Umbral de volumen:',
             settingLanguage: 'Idioma:',
             
@@ -440,7 +440,7 @@ const i18n = {
             commandPrevious: '이전 - 이전 세그먼트 재생',
             
             settingsTitle: '고급 설정',
-            settingSilence: '무음 임계값 (초):',
+            settingSilence: '무음 임계값:',
             settingVolume: '볼륨 임계값:',
             settingLanguage: '언어:',
             
@@ -500,7 +500,7 @@ const i18n = {
             commandPrevious: 'Назад - Предыдущий сегмент',
             
             settingsTitle: 'Расширенные настройки',
-            settingSilence: 'Порог тишины (сек.):',
+            settingSilence: 'Порог тишины:',
             settingVolume: 'Порог громкости:',
             settingLanguage: 'Язык:',
             
