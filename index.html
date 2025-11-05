@@ -778,7 +778,7 @@
                 this.lastManualClickIndex = -1; // 最后一次手动点击的索引
                 this.recognitionRestartCount = 0; // 重启计数器
                 this.maxRestartAttempts = 3; // 最大重启次数
-                this.isPausedForPlayback = false; // 播放时暂停识别的标志
+                this.isPlayingAudio = false; // 播放音频的标志（用于忽略播放期间的语音命令）
                 
                 this.initElements();
                 this.initLanguageSelector(); // 初始化语言选择器
@@ -1171,12 +1171,6 @@
                 };
 
                 this.recognition.onend = () => {
-                    // 如果是因为播放而暂停，不自动重启（会在播放结束后手动重启）
-                    if (this.isPausedForPlayback) {
-                        console.log('播放期间暂停，等待手动恢复');
-                        return;
-                    }
-                    
                     // 如果语音控制还在激活状态，自动重启
                     if (this.isVoiceControlActive) {
                         // 检查重启次数，防止无限循环
@@ -1245,7 +1239,6 @@
                 try {
                     // 重置重启计数器
                     this.recognitionRestartCount = 0;
-                    this.isPausedForPlayback = false; // 重置播放暂停标志
                     
                     this.recognition.start();
                     this.isVoiceControlActive = true;
@@ -1296,7 +1289,7 @@
                 }
                 this.isVoiceControlActive = false;
                 this.recognitionRestartCount = 0; // 重置计数器
-                this.isPausedForPlayback = false; // 重置播放暂停标志
+                this.isPlayingAudio = false; // 重置播放标志
                 this.voiceControlBtn.textContent = i18n.t('startDictation');
                 this.voiceIndicator.classList.add('inactive');
                 this.voiceStatus.textContent = i18n.t('voiceControlOff');
@@ -1309,6 +1302,12 @@
 
             handleVoiceCommand(command) {
                 console.log('语音命令:', command);
+                
+                // 播放期间忽略所有语音命令（避免误识别播放内容为命令）
+                if (this.isPlayingAudio) {
+                    console.log('播放期间，忽略语音命令');
+                    return;
+                }
                 
                 // 获取当前语言的语音命令配置
                 const commands = i18n.getVoiceCommands();
@@ -1905,25 +1904,21 @@
             }
 
             async playSegmentTwice(index, button) {
-                // 停止当前播放
+                // 停止当前播放并设置其进度为100%
                 if (this.currentlyPlaying) {
                     this.currentlyPlaying.source.stop();
                     this.currentlyPlaying.button.classList.remove('playing');
-                    // 不重置之前片段的进度条，保持100%显示已播放状态
-                }
-
-                // 播放时暂停语音识别（需求2）
-                const needResumeRecognition = this.isVoiceControlActive && this.recognition;
-                if (needResumeRecognition) {
-                    try {
-                        this.isPausedForPlayback = true; // 设置标志位
-                        this.recognition.stop();
-                        console.log('播放时暂停语音识别');
-                    } catch (e) {
-                        console.log('暂停语音识别失败:', e);
-                        this.isPausedForPlayback = false;
+                    
+                    // 将被中断的片段进度条设为100%
+                    const prevIndex = this.currentlyPlaying.index;
+                    const prevWaveformFill = document.getElementById(`waveform-${prevIndex}`);
+                    if (prevWaveformFill) {
+                        prevWaveformFill.style.width = '100%';
                     }
                 }
+
+                // 设置播放标志，播放期间忽略语音命令
+                this.isPlayingAudio = true;
 
                 // 重置当前片段的进度条为0%，准备开始播放
                 const currentWaveformFill = document.getElementById(`waveform-${index}`);
@@ -1931,7 +1926,9 @@
                     currentWaveformFill.style.width = '0%';
                 }
 
+                // 设置片段指示器为当前点击的片段
                 this.currentPlayingIndex = index;
+                this.lastManualClickIndex = index;
                 this.updateCurrentPlayingUI(index);
 
                 // 第一次播放
@@ -1946,18 +1943,9 @@
                 // 播放完成后清除状态
                 this.updateCurrentPlayingUI(-1);
                 
-                // 播放结束后恢复语音识别（需求2）
-                if (needResumeRecognition) {
-                    setTimeout(() => {
-                        this.isPausedForPlayback = false; // 清除标志位
-                        try {
-                            this.recognition.start();
-                            console.log('播放结束，恢复语音识别');
-                        } catch (e) {
-                            console.log('恢复语音识别失败:', e);
-                        }
-                    }, 200);
-                }
+                // 延迟300ms后清除播放标志，避免播放结束瞬间的声音被识别
+                await new Promise(resolve => setTimeout(resolve, 300));
+                this.isPlayingAudio = false;
                 
                 // 保存播放进度到 localStorage
                 this.saveProgress();

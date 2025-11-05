@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>i18n 验证</title>
+    <script src="../i18n.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1f2937; color: #f3f4f6; }
+        .ok { color: #10b981; }
+        .warn { color: #f59e0b; }
+        .error { color: #ef4444; }
+        pre { background: #111827; padding: 10px; border-radius: 4px; }
+        h2 { color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <h1>🔍 i18n 翻译完整性检查</h1>
+    <div id="result"></div>
+    
+    <script>
+        const requiredKeys = [
+            'appTitle', 'startRecording', 'stopRecording', 'startDictation', 'pauseDictation',
+            'statusReady', 'statusRecording', 'statusProcessing', 'statusComplete', 'statusRestored',
+            'statusRestoredWithProgress', 'statusNoSegments', 'statusInterrupted',
+            'visualizerLabel', 'voiceControlTitle', 'voiceControlOff', 'voiceControlListening', 'voiceControlWaiting',
+            'commandsTitle', 'commandStart', 'commandNext', 'commandReplay', 'commandPrevious',
+            'settingsTitle', 'settingSilence', 'settingVolume', 'settingLanguage',
+            'segmentsTitle', 'playButton', 'secondUnit', 'emptyState',
+            'alertNeedRecording', 'alertMicPermission', 'alertRecordingInterrupted', 'alertStorageFull', 'alertStorageFullWithUsable',
+            'errorSpeechNotSupported', 'errorSpeechServiceAbnormal', 'errorMicPermissionDenied', 'errorNetworkIssue', 'errorRecognition',
+            'wechatTitle', 'wechatText', 'wechatStep1', 'wechatStep2', 'wechatSupport'
+        ];
+
+        const languages = Object.keys(i18n.translations);
+        let output = `<h2>翻译键检查 (${requiredKeys.length} 个必需键)</h2>`;
+        let hasIssues = false;
+
+        languages.forEach(lang => {
+            const translations = i18n.translations[lang];
+            const missing = requiredKeys.filter(key => !(key in translations));
+            const existing = Object.keys(translations);
+            const extra = existing.filter(key => !requiredKeys.includes(key));
+            
+            output += `<h3>${lang.toUpperCase()} - ${i18n.languages[lang].name} ${i18n.languages[lang].flag}</h3>`;
+            
+            if (missing.length === 0 && extra.length === 0) {
+                output += `<div class="ok">✅ 完美！包含所有 ${existing.length} 个键</div>`;
+            } else {
+                if (missing.length > 0) {
+                    output += `<div class="error">❌ 缺少 ${missing.length} 个键:</div>`;
+                    output += `<pre>${missing.join('\n')}</pre>`;
+                    hasIssues = true;
+                }
+                if (extra.length > 0) {
+                    output += `<div class="warn">⚠️ 多余 ${extra.length} 个键:</div>`;
+                    output += `<pre>${extra.join('\n')}</pre>`;
+                    hasIssues = true;
+                }
+            }
+        });
+
+        // 检查语音命令
+        output += '<h2>语音命令检查</h2>';
+        const requiredCommandKeys = ['next', 'replay', 'previous'];
+
+        languages.forEach(lang => {
+            const commands = i18n.voiceCommands[lang];
+            output += `<h3>${lang.toUpperCase()}</h3>`;
+            
+            if (!commands) {
+                output += `<div class="error">❌ 缺少语音命令配置</div>`;
+                hasIssues = true;
+            } else {
+                const missing = requiredCommandKeys.filter(key => !commands[key] || commands[key].length === 0);
+                if (missing.length > 0) {
+                    output += `<div class="error">❌ 缺少命令: ${missing.join(', ')}</div>`;
+                    hasIssues = true;
+                } else {
+                    output += `<div class="ok">✅ next: ${commands.next.length}, replay: ${commands.replay.length}, previous: ${commands.previous.length}</div>`;
+                }
+            }
+        });
+
+        if (!hasIssues) {
+            output += '<h2 class="ok">🎉 所有语言翻译完整且一致！</h2>';
+        } else {
+            output += '<h2 class="warn">⚠️ 发现不一致</h2>';
+        }
+
+        document.getElementById('result').innerHTML = output;
+    </script>
+</body>
+</html>
+
