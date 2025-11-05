@@ -676,7 +676,7 @@
         </div>
 
         <div class="empty-state" id="emptyState">
-            点击"开始录制"按钮开始录音
+            点击"开始录制"按钮开始录音<br> 每词间隔一秒
         </div>
     </div>
 
@@ -1000,8 +1000,8 @@
                 
                 // 播放下一个的命令
                 const nextCommands = ['下一个', '下一题', '好的', '写好了', '继续', '下一句', '对了', '好了', '完成', '知道了', '好', 'ok'];
-                // 重播的命令
-                const replayCommands = ['重播', '再说一遍', '再来一次', '什么', '没听清', '再听', '听不清', '重复', '重来'];
+                // 重播的命令（包含"开始"，用于开始听写）
+                const replayCommands = ['开始', '重播', '再说一遍', '再来一次', '什么', '没听清', '再听', '听不清', '重复', '重来'];
                 // 上一个的命令
                 const prevCommands = ['上一个', '上一题', '回退', '返回', '上一句', '前一个'];
                 
@@ -1275,6 +1275,34 @@
                 }
             }
 
+            getPlayedSegments() {
+                // 获取进度条为100%的片段索引列表
+                const playedSegments = [];
+                for (let i = 0; i < this.segments.length; i++) {
+                    const waveformFill = document.getElementById(`waveform-${i}`);
+                    if (waveformFill && waveformFill.style.width === '100%') {
+                        playedSegments.push(i);
+                    }
+                }
+                return playedSegments;
+            }
+
+            saveProgress() {
+                // 只更新播放进度，不重新保存音频数据
+                try {
+                    const savedData = localStorage.getItem('voiceRecorderData');
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        data.currentPlayingIndex = this.currentPlayingIndex;
+                        data.lastManualClickIndex = this.lastManualClickIndex;
+                        data.playedSegments = this.getPlayedSegments();
+                        localStorage.setItem('voiceRecorderData', JSON.stringify(data));
+                    }
+                } catch (error) {
+                    console.error('保存播放进度失败:', error);
+                }
+            }
+
             async saveToLocalStorage(audioBlob) {
                 try {
                     // 将 Blob 转为 base64
@@ -1289,7 +1317,10 @@
                                     timestamp: Date.now(),
                                     segmentCount: this.segments.length,
                                     silenceThreshold: this.silenceThreshold,
-                                    volumeThreshold: this.volumeThreshold
+                                    volumeThreshold: this.volumeThreshold,
+                                    currentPlayingIndex: this.currentPlayingIndex,
+                                    lastManualClickIndex: this.lastManualClickIndex,
+                                    playedSegments: this.getPlayedSegments() // 获取已播放的片段列表
                                 };
                                 localStorage.setItem('voiceRecorderData', JSON.stringify(data));
                                 console.log('数据已保存到 localStorage');
@@ -1349,11 +1380,37 @@
 
                     if (this.segments.length > 0) {
                         this.displaySegments();
-                        this.updateStatus(`✅ 已恢复 ${this.segments.length} 个片段`, 'ready');
+                        
+                        // 恢复播放进度
+                        if (data.currentPlayingIndex !== undefined) {
+                            this.currentPlayingIndex = data.currentPlayingIndex;
+                        }
+                        if (data.lastManualClickIndex !== undefined) {
+                            this.lastManualClickIndex = data.lastManualClickIndex;
+                        }
+                        
+                        // 恢复已播放片段的进度条状态
+                        if (data.playedSegments && Array.isArray(data.playedSegments)) {
+                            data.playedSegments.forEach(index => {
+                                const waveformFill = document.getElementById(`waveform-${index}`);
+                                if (waveformFill) {
+                                    waveformFill.style.width = '100%';
+                                }
+                            });
+                        }
+                        
+                        // 更新状态信息
+                        const playedCount = data.playedSegments ? data.playedSegments.length : 0;
+                        let statusMsg = `✅ 已恢复 ${this.segments.length} 个片段`;
+                        if (playedCount > 0) {
+                            statusMsg += `（已完成 ${playedCount}/${this.segments.length}）`;
+                        }
+                        this.updateStatus(statusMsg, 'ready');
+                        
                         this.voiceControl.classList.add('active');
                         // 启用语音控制按钮
                         this.updateVoiceControlButton();
-                        console.log('数据恢复成功');
+                        console.log('数据恢复成功，包括播放进度');
                     }
                 } catch (error) {
                     console.error('从 localStorage 加载失败:', error);
@@ -1543,7 +1600,7 @@
                 // 第一次播放
                 await this.playSegmentOnce(index, button);
                 
-                // 等待0.3秒
+                // 等待0.5秒
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // 第二次播放
@@ -1551,6 +1608,9 @@
                 
                 // 播放完成后清除状态
                 this.updateCurrentPlayingUI(-1);
+                
+                // 保存播放进度到 localStorage
+                this.saveProgress();
             }
 
             playSegmentOnce(index, button) {
