@@ -730,11 +730,13 @@
                 this.lastManualClickIndex = -1; // 最后一次手动点击的索引
                 this.recognitionRestartCount = 0; // 重启计数器
                 this.maxRestartAttempts = 3; // 最大重启次数
+                this.isPausedForPlayback = false; // 播放时暂停识别的标志
                 
                 this.initElements();
                 this.initEventListeners();
                 this.initCanvas();
                 this.initSpeechRecognition();
+                this.loadSettings(); // 加载设置（需求3）
                 this.updateVoiceControlButton(); // 初始化按钮状态
                 this.loadFromLocalStorage();
             }
@@ -782,11 +784,13 @@
                 this.silenceThresholdInput.addEventListener('input', (e) => {
                     this.silenceThreshold = parseFloat(e.target.value);
                     this.silenceValue.textContent = this.silenceThreshold.toFixed(1) + ' 秒';
+                    this.saveSettings();
                 });
 
                 this.volumeThresholdInput.addEventListener('input', (e) => {
                     this.volumeThreshold = parseFloat(e.target.value);
                     this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
+                    this.saveSettings();
                 });
 
                 // 语音控制按钮
@@ -805,6 +809,45 @@
                 } else {
                     this.settingsContent.classList.add('expanded');
                     this.settingsToggle.classList.add('expanded');
+                }
+            }
+
+            saveSettings() {
+                // 保存设置到单独的 localStorage 项（需求3）
+                try {
+                    const settings = {
+                        silenceThreshold: this.silenceThreshold,
+                        volumeThreshold: this.volumeThreshold
+                    };
+                    localStorage.setItem('voiceRecorderSettings', JSON.stringify(settings));
+                } catch (error) {
+                    console.error('保存设置失败:', error);
+                }
+            }
+
+            loadSettings() {
+                // 从 localStorage 加载设置（需求3）
+                try {
+                    const savedSettings = localStorage.getItem('voiceRecorderSettings');
+                    if (savedSettings) {
+                        const settings = JSON.parse(savedSettings);
+                        
+                        if (settings.silenceThreshold !== undefined) {
+                            this.silenceThreshold = settings.silenceThreshold;
+                            this.silenceThresholdInput.value = settings.silenceThreshold;
+                            this.silenceValue.textContent = settings.silenceThreshold.toFixed(1) + ' 秒';
+                        }
+                        
+                        if (settings.volumeThreshold !== undefined) {
+                            this.volumeThreshold = settings.volumeThreshold;
+                            this.volumeThresholdInput.value = settings.volumeThreshold;
+                            this.volumeValue.textContent = settings.volumeThreshold.toFixed(3);
+                        }
+                        
+                        console.log('设置已恢复:', settings);
+                    }
+                } catch (error) {
+                    console.error('加载设置失败:', error);
                 }
             }
 
@@ -867,6 +910,12 @@
                 };
 
                 this.recognition.onend = () => {
+                    // 如果是因为播放而暂停，不自动重启（会在播放结束后手动重启）
+                    if (this.isPausedForPlayback) {
+                        console.log('播放期间暂停，等待手动恢复');
+                        return;
+                    }
+                    
                     // 如果语音控制还在激活状态，自动重启
                     if (this.isVoiceControlActive) {
                         // 检查重启次数，防止无限循环
@@ -935,6 +984,7 @@
                 try {
                     // 重置重启计数器
                     this.recognitionRestartCount = 0;
+                    this.isPausedForPlayback = false; // 重置播放暂停标志
                     
                     this.recognition.start();
                     this.isVoiceControlActive = true;
@@ -985,6 +1035,7 @@
                 }
                 this.isVoiceControlActive = false;
                 this.recognitionRestartCount = 0; // 重置计数器
+                this.isPausedForPlayback = false; // 重置播放暂停标志
                 this.voiceControlBtn.textContent = '开始听写';
                 this.voiceIndicator.classList.add('inactive');
                 this.voiceStatus.textContent = '语音控制已关闭';
@@ -999,9 +1050,9 @@
                 console.log('语音命令:', command);
                 
                 // 播放下一个的命令
-                const nextCommands = ['下一个', '下一题', '好的', '写好了', '继续', '下一句', '对了', '好了', '完成', '知道了', '好', 'ok'];
+                const nextCommands = ['好了', '下一个',  '下一条','下一题', '好的', '写好了', '继续', '下一句', '对了', '完成', '知道了', '好', 'ok'];
                 // 重播的命令（包含"开始"，用于开始听写）
-                const replayCommands = ['开始', '重播', '再说一遍', '再来一次', '什么', '没听清', '再听', '听不清', '重复', '重来'];
+                const replayCommands = ['什么', '开始', '重播', '再说一遍', '再来一次',  '没听清', '再听', '听不清', '重复', '重来'];
                 // 上一个的命令
                 const prevCommands = ['上一个', '上一题', '回退', '返回', '上一句', '前一个'];
                 
@@ -1264,6 +1315,9 @@
                     this.updateStatus(`✅ 录音完成,已分割为 ${this.segments.length} 个片段`, 'ready');
                     // 显示语音控制区域
                     this.voiceControl.classList.add('active');
+                    // 重置播放位置到开头（需求1）
+                    this.currentPlayingIndex = -1;
+                    this.lastManualClickIndex = -1;
                     // 启用语音控制按钮
                     this.updateVoiceControlButton();
                     // 保存到 localStorage
@@ -1353,18 +1407,6 @@
                         timestamp: new Date(data.timestamp),
                         segmentCount: data.segmentCount
                     });
-
-                    // 恢复参数设置
-                    if (data.silenceThreshold) {
-                        this.silenceThreshold = data.silenceThreshold;
-                        this.silenceThresholdInput.value = data.silenceThreshold;
-                        this.silenceValue.textContent = data.silenceThreshold.toFixed(1) + ' 秒';
-                    }
-                    if (data.volumeThreshold) {
-                        this.volumeThreshold = data.volumeThreshold;
-                        this.volumeThresholdInput.value = data.volumeThreshold;
-                        this.volumeValue.textContent = data.volumeThreshold.toFixed(3);
-                    }
 
                     // 将 base64 转回 Blob
                     const response = await fetch(data.audioData);
@@ -1588,6 +1630,19 @@
                     // 不重置之前片段的进度条，保持100%显示已播放状态
                 }
 
+                // 播放时暂停语音识别（需求2）
+                const needResumeRecognition = this.isVoiceControlActive && this.recognition;
+                if (needResumeRecognition) {
+                    try {
+                        this.isPausedForPlayback = true; // 设置标志位
+                        this.recognition.stop();
+                        console.log('播放时暂停语音识别');
+                    } catch (e) {
+                        console.log('暂停语音识别失败:', e);
+                        this.isPausedForPlayback = false;
+                    }
+                }
+
                 // 重置当前片段的进度条为0%，准备开始播放
                 const currentWaveformFill = document.getElementById(`waveform-${index}`);
                 if (currentWaveformFill) {
@@ -1608,6 +1663,19 @@
                 
                 // 播放完成后清除状态
                 this.updateCurrentPlayingUI(-1);
+                
+                // 播放结束后恢复语音识别（需求2）
+                if (needResumeRecognition) {
+                    setTimeout(() => {
+                        this.isPausedForPlayback = false; // 清除标志位
+                        try {
+                            this.recognition.start();
+                            console.log('播放结束，恢复语音识别');
+                        } catch (e) {
+                            console.log('恢复语音识别失败:', e);
+                        }
+                    }, 200);
+                }
                 
                 // 保存播放进度到 localStorage
                 this.saveProgress();
