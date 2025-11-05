@@ -786,6 +786,7 @@
                 this.lastManualClickIndex = -1; // 最后一次手动点击的索引
                 this.recognitionRestartCount = 0; // 重启计数器
                 this.maxRestartAttempts = 3; // 最大重启次数
+                this.currentPlaybackId = 0; // 当前播放任务的唯一ID，用于取消旧的播放任务
 
                 this.initElements();
                 this.initLanguageSelector(); // 初始化语言选择器
@@ -1532,10 +1533,8 @@
             }
 
             playNext() {
-                if (this.currentlyPlaying) {
-                    // 等待当前播放完成
-                    return;
-                }
+                // 不再等待当前播放，直接开始新播放
+                // playSegmentTwice 会处理停止当前播放的逻辑
 
                 let nextIndex;
                 if (this.lastManualClickIndex >= 0) {
@@ -1566,10 +1565,7 @@
             }
 
             replayCurrent() {
-                if (this.currentlyPlaying) {
-                    // 如果正在播放，先停止
-                    this.currentlyPlaying.source.stop();
-                }
+                // playSegmentTwice 会处理停止当前播放的逻辑
 
                 const index = this.lastManualClickIndex >= 0 ? this.lastManualClickIndex : this.currentPlayingIndex;
                 if (index < 0 || index >= this.segments.length) {
@@ -1585,9 +1581,8 @@
             }
 
             playPrevious() {
-                if (this.currentlyPlaying) {
-                    return;
-                }
+                // 不再等待当前播放，直接开始新播放
+                // playSegmentTwice 会处理停止当前播放的逻辑
 
                 const currentIndex = this.lastManualClickIndex >= 0 ? this.lastManualClickIndex : this.currentPlayingIndex;
                 const prevIndex = currentIndex - 1;
@@ -1953,6 +1948,9 @@
             }
 
             async playSegmentTwice(index, button) {
+                // 生成新的播放任务ID，用于取消之前的播放任务
+                const playbackId = ++this.currentPlaybackId;
+
                 // 停止当前播放并设置其进度为100%
                 if (this.currentlyPlaying) {
                     this.currentlyPlaying.source.stop();
@@ -1984,19 +1982,27 @@
                 this.updateCurrentPlayingUI(index);
 
                 // 第一次播放
-                await this.playSegmentOnce(index, button);
+                await this.playSegmentOnce(index, button, playbackId);
+                // 检查播放任务是否被取消
+                if (playbackId !== this.currentPlaybackId) return;
 
                 // 等待0.5秒
                 await new Promise(resolve => setTimeout(resolve, 500));
+                // 检查播放任务是否被取消
+                if (playbackId !== this.currentPlaybackId) return;
 
                 // 第二次播放
-                await this.playSegmentOnce(index, button);
+                await this.playSegmentOnce(index, button, playbackId);
+                // 检查播放任务是否被取消
+                if (playbackId !== this.currentPlaybackId) return;
 
                 // 播放完成后清除状态
                 this.updateCurrentPlayingUI(-1);
 
                 // 延迟300ms后重启语音识别，避免播放结束瞬间的声音被识别
                 await new Promise(resolve => setTimeout(resolve, 300));
+                // 检查播放任务是否被取消
+                if (playbackId !== this.currentPlaybackId) return;
 
                 // 播放结束后：如果之前停止了语音识别，现在重启它
                 if (shouldRestartRecognition) {
@@ -2007,48 +2013,60 @@
                 this.saveProgress();
             }
 
-            playSegmentOnce(index, button) {
+            playSegmentOnce(index, button, playbackId) {
                 return new Promise((resolve) => {
                     const segment = this.segments[index];
                     const source = this.audioContext.createBufferSource();
                     source.buffer = segment;
                     source.connect(this.audioContext.destination);
-                    
+
                     // 只改变样式，不改变文字
                     button.classList.add('playing');
-                    
+
                     const waveformFill = document.getElementById(`waveform-${index}`);
                     const duration = segment.duration * 1000;
                     let startTime = Date.now();
-                    
+
                     const updateProgress = () => {
+                        // 检查播放任务是否被取消
+                        if (playbackId !== this.currentPlaybackId) {
+                            return; // 停止更新进度条
+                        }
+
                         const elapsed = Date.now() - startTime;
                         const progress = Math.min((elapsed / duration) * 100, 100);
                         if (waveformFill) {
                             waveformFill.style.width = progress + '%';
                         }
-                        
+
                         if (progress < 100) {
                             requestAnimationFrame(updateProgress);
                         }
                     };
-                    
+
                     source.onended = () => {
+                        // 检查播放任务是否被取消
+                        if (playbackId !== this.currentPlaybackId) {
+                            // 任务已被取消，直接返回，不执行任何UI更新
+                            resolve();
+                            return;
+                        }
+
                         // 确保进度条显示100%并保持
                         if (waveformFill) {
                             waveformFill.style.width = '100%';
                         }
-                        
+
                         // 延迟后移除播放状态（但保持进度条100%）
                         setTimeout(() => {
                             button.classList.remove('playing');
                         }, 150);
-                        
+
                         this.currentlyPlaying = null;
                         resolve();
                     };
-                    
-                    this.currentlyPlaying = { source, button, index };
+
+                    this.currentlyPlaying = { source, button, index, playbackId };
                     source.start();
                     requestAnimationFrame(updateProgress);
                 });
