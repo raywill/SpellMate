@@ -462,7 +462,7 @@
                 display: none !important;
             }
 
-            #voiceControlBtn {
+            .dict-btn {
                 width: 100%;
                 padding: 12px 20px;
             }
@@ -498,9 +498,16 @@
             color: #6b7280;
         }
 
-        #voiceControlBtn {
+        .dict-btn {
             padding: 8px 20px;
             font-size: 14px;
+            background: #667eea;
+            color: white;
+            min-width: 80px;
+        }
+
+        .dict-btn:hover {
+            background: #5568d3;
         }
 
         .voice-commands {
@@ -681,7 +688,7 @@
                     <div class="pulse"></div>
                     <span id="voiceStatus">语音控制已关闭</span>
                 </div>
-                <button id="voiceControlBtn" class="play-btn">开始听写</button>
+                <button id="voiceControlBtn" class="dict-btn">开始听写</button>
             </div>
             <div class="recognition-text empty" id="recognitionText">等待语音命令...</div>
             <div class="voice-commands">
