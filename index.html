@@ -644,10 +644,9 @@
             <div class="recognition-text empty" id="recognitionText">等待语音命令...</div>
             <div class="voice-commands">
                 <strong>📝 可用命令：</strong><br>
-                • <strong>下一个/下一题/好的/写好了/继续/下一句/对了/好</strong> - 播放下一个片段<br>
-                • <strong>开始/重播/再说一遍/再来一次/什么/没听清</strong> - 重新播放当前片段<br>
-                • <strong>上一个/上一题/回退/返回</strong> - 播放上一个片段<br>
-                <small>💡 每个片段会自动连播两次，停顿0.3秒</small>
+                • <strong>好了</strong> - 播放下一个片段<br>
+                • <strong>什么</strong> - 重新播放当前片段<br>
+                • <strong>上一个</strong> - 播放上一个片段<br>
             </div>
         </div>
 
@@ -1050,9 +1049,9 @@
                 console.log('语音命令:', command);
                 
                 // 播放下一个的命令
-                const nextCommands = ['好了', '下一个',  '下一条','下一题', '好的', '写好了', '继续', '下一句', '对了', '完成', '知道了', '好', 'ok'];
+                const nextCommands = ['好', '好了', '好啦', '好咯', 'ok', '下一个',  '下一条','下一题', '好的', '写好了', '继续', '下一句', '对了', '完成', '知道了'];
                 // 重播的命令（包含"开始"，用于开始听写）
-                const replayCommands = ['什么', '开始', '重播', '再说一遍', '再来一次',  '没听清', '再听', '听不清', '重复', '重来'];
+                const replayCommands = ['什么', '啥', '开始', '重播', '再说一遍', '再来一次',  '没听清', '再听', '听不清', '重复', '重来'];
                 // 上一个的命令
                 const prevCommands = ['上一个', '上一题', '回退', '返回', '上一句', '前一个'];
                 
