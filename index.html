@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语音录制与分段播放</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #startBtn {
+            background: #10b981;
+            color: white;
+        }
+
+        #stopBtn {
+            background: #ef4444;
+            color: white;
+        }
+
+        #startBtn:hover {
+            background: #059669;
+        }
+
+        #stopBtn:hover {
+            background: #dc2626;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .status.recording {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status.processing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status.ready {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status.idle {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .segments {
+            margin-top: 30px;
+        }
+
+        .segments h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .segment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .segment-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .segment-item:hover {
+            background: #f3f4f6;
+            transform: translateX(5px);
+        }
+
+        .segment-number {
+            font-weight: 700;
+            color: #667eea;
+            font-size: 18px;
+            min-width: 30px;
+        }
+
+        .segment-duration {
+            color: #6b7280;
+            font-size: 14px;
+            min-width: 60px;
+        }
+
+        .play-btn {
+            padding: 8px 20px;
+            font-size: 14px;
+            background: #667eea;
+            color: white;
+            min-width: 80px;
+        }
+
+        .play-btn:hover {
+            background: #5568d3;
+        }
+
+        .play-btn.playing {
+            background: #10b981;
+        }
+
+        .waveform {
+            flex: 1;
+            height: 40px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .waveform-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .settings {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .settings h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .setting-item label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .setting-item input[type="range"] {
+            width: 200px;
+        }
+
+        .setting-item .value {
+            color: #333;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #9ca3af;
+            padding: 40px;
+            font-size: 14px;
+        }
+
+        .visualizer-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .visualizer-container.active {
+            display: block;
+        }
+
+        #audioVisualizer {
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(to bottom, #1f2937 0%, #111827 100%);
+            border-radius: 8px;
+            display: block;
+        }
+
+        .visualizer-label {
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ 语音录制与分段播放</h1>
+        
+        <div class="controls">
+            <button id="startBtn">开始录制</button>
+            <button id="stopBtn" disabled>结束录制</button>
+        </div>
+
+        <div id="status" class="status idle">准备就绪</div>
+
+        <div class="visualizer-container" id="visualizerContainer">
+            <canvas id="audioVisualizer"></canvas>
+            <div class="visualizer-label">🎵 实时音频波形</div>
+        </div>
+
+        <div class="settings">
+            <h3>⚙️ 设置</h3>
+            <div class="setting-item">
+                <label>停顿阈值 (秒):</label>
+                <input type="range" id="silenceThreshold" min="0.5" max="3" step="0.1" value="1.0">
+                <span class="value" id="silenceValue">1.0 秒</span>
+            </div>
+            <div class="setting-item">
+                <label>音量阈值:</label>
+                <input type="range" id="volumeThreshold" min="0.001" max="0.05" step="0.001" value="0.01">
+                <span class="value" id="volumeValue">0.010</span>
+            </div>
+        </div>
+
+        <div class="segments" id="segmentsContainer" style="display: none;">
+            <h2>📝 录音片段 (<span id="segmentCount">0</span>)</h2>
+            <div class="segment-list" id="segmentList"></div>
+        </div>
+
+        <div class="empty-state" id="emptyState">
+            点击"开始录制"按钮开始录音
+        </div>
+    </div>
+
+    <script>
+        class VoiceRecorder {
+            constructor() {
+                this.mediaRecorder = null;
+                this.audioContext = null;
+                this.analyser = null;
+                this.audioChunks = [];
+                this.isRecording = false;
+                this.segments = [];
+                this.silenceThreshold = 1.0; // 秒
+                this.volumeThreshold = 0.01; // 音量阈值
+                this.currentlyPlaying = null;
+                this.animationId = null;
+                this.dataArray = null;
+                
+                this.initElements();
+                this.initEventListeners();
+                this.initCanvas();
+            }
+
+            initElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.status = document.getElementById('status');
+                this.segmentList = document.getElementById('segmentList');
+                this.segmentsContainer = document.getElementById('segmentsContainer');
+                this.emptyState = document.getElementById('emptyState');
+                this.segmentCount = document.getElementById('segmentCount');
+                this.silenceThresholdInput = document.getElementById('silenceThreshold');
+                this.silenceValue = document.getElementById('silenceValue');
+                this.volumeThresholdInput = document.getElementById('volumeThreshold');
+                this.volumeValue = document.getElementById('volumeValue');
+                this.visualizerContainer = document.getElementById('visualizerContainer');
+                this.canvas = document.getElementById('audioVisualizer');
+                this.canvasCtx = this.canvas.getContext('2d');
+            }
+
+            initCanvas() {
+                // 设置canvas的实际像素大小
+                const container = this.canvas.parentElement;
+                this.canvas.width = container.clientWidth - 40; // 减去padding
+                this.canvas.height = 100;
+            }
+
+            initEventListeners() {
+                this.startBtn.addEventListener('click', () => this.startRecording());
+                this.stopBtn.addEventListener('click', () => this.stopRecording());
+                
+                this.silenceThresholdInput.addEventListener('input', (e) => {
+                    this.silenceThreshold = parseFloat(e.target.value);
+                    this.silenceValue.textContent = this.silenceThreshold.toFixed(1) + ' 秒';
+                });
+
+                this.volumeThresholdInput.addEventListener('input', (e) => {
+                    this.volumeThreshold = parseFloat(e.target.value);
+                    this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
+                });
+            }
+
+            updateStatus(message, className) {
+                this.status.textContent = message;
+                this.status.className = `status ${className}`;
+            }
+
+            async startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    // 设置音频可视化
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.analyser = this.audioContext.createAnalyser();
+                    const source = this.audioContext.createMediaStreamSource(stream);
+                    source.connect(this.analyser);
+                    
+                    this.analyser.fftSize = 2048;
+                    const bufferLength = this.analyser.frequencyBinCount;
+                    this.dataArray = new Uint8Array(bufferLength);
+                    
+                    this.audioChunks = [];
+                    this.mediaRecorder = new MediaRecorder(stream);
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.audioChunks.push(event.data);
+                        }
+                    };
+
+                    this.mediaRecorder.onstop = () => {
+                        this.processRecording();
+                    };
+
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.updateStatus('🔴 正在录音...', 'recording');
+                    
+                    // 显示可视化容器并开始绘制波形
+                    this.visualizerContainer.classList.add('active');
+                    this.drawWaveform();
+                    
+                } catch (error) {
+                    console.error('录音失败:', error);
+                    alert('无法访问麦克风,请检查权限设置');
+                }
+            }
+
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    this.isRecording = false;
+                    
+                    // 停止波形动画
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                    }
+                    
+                    // 隐藏可视化容器
+                    this.visualizerContainer.classList.remove('active');
+                    
+                    this.startBtn.disabled = false;
+                    this.stopBtn.disabled = true;
+                    this.updateStatus('⏳ 正在处理录音...', 'processing');
+                }
+            }
+
+            drawWaveform() {
+                if (!this.isRecording) {
+                    return;
+                }
+                
+                this.animationId = requestAnimationFrame(() => this.drawWaveform());
+                
+                this.analyser.getByteTimeDomainData(this.dataArray);
+                
+                // 清空canvas
+                this.canvasCtx.fillStyle = 'rgb(17, 24, 39)';
+                this.canvasCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // 绘制波形
+                this.canvasCtx.lineWidth = 2;
+                this.canvasCtx.strokeStyle = 'rgb(16, 185, 129)'; // 绿色
+                this.canvasCtx.beginPath();
+                
+                const sliceWidth = this.canvas.width * 1.0 / this.dataArray.length;
+                let x = 0;
+                
+                for (let i = 0; i < this.dataArray.length; i++) {
+                    const v = this.dataArray[i] / 128.0; // 归一化到0-2
+                    const y = v * this.canvas.height / 2;
+                    
+                    if (i === 0) {
+                        this.canvasCtx.moveTo(x, y);
+                    } else {
+                        this.canvasCtx.lineTo(x, y);
+                    }
+                    
+                    x += sliceWidth;
+                }
+                
+                this.canvasCtx.lineTo(this.canvas.width, this.canvas.height / 2);
+                this.canvasCtx.stroke();
+                
+                // 添加中线作为参考
+                this.canvasCtx.strokeStyle = 'rgba(107, 114, 128, 0.3)';
+                this.canvasCtx.lineWidth = 1;
+                this.canvasCtx.beginPath();
+                this.canvasCtx.moveTo(0, this.canvas.height / 2);
+                this.canvasCtx.lineTo(this.canvas.width, this.canvas.height / 2);
+                this.canvasCtx.stroke();
+            }
+
+            async processRecording() {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                
+                this.segments = this.splitAudioByPauses(audioBuffer);
+                
+                if (this.segments.length > 0) {
+                    this.displaySegments();
+                    this.updateStatus(`✅ 录音完成,已分割为 ${this.segments.length} 个片段`, 'ready');
+                } else {
+                    this.updateStatus('⚠️ 未检测到有效语音片段', 'idle');
+                }
+            }
+
+            splitAudioByPauses(audioBuffer) {
+                const channelData = audioBuffer.getChannelData(0);
+                const sampleRate = audioBuffer.sampleRate;
+                const silenceSamples = Math.floor(this.silenceThreshold * sampleRate);
+                
+                // 计算每个样本的音量
+                const volumes = [];
+                const windowSize = Math.floor(sampleRate * 0.02); // 20ms window
+                
+                for (let i = 0; i < channelData.length; i += windowSize) {
+                    let sum = 0;
+                    for (let j = 0; j < windowSize && i + j < channelData.length; j++) {
+                        sum += Math.abs(channelData[i + j]);
+                    }
+                    volumes.push(sum / windowSize);
+                }
+                
+                // 查找停顿点
+                const segments = [];
+                let segmentStart = null;
+                let silenceStart = null;
+                let silenceCount = 0;
+                
+                for (let i = 0; i < volumes.length; i++) {
+                    const currentTime = i * windowSize / sampleRate;
+                    
+                    if (volumes[i] > this.volumeThreshold) {
+                        // 有声音
+                        if (segmentStart === null) {
+                            segmentStart = i * windowSize;
+                        }
+                        silenceStart = null;
+                        silenceCount = 0;
+                    } else {
+                        // 静音
+                        if (segmentStart !== null) {
+                            if (silenceStart === null) {
+                                silenceStart = i * windowSize;
+                            }
+                            silenceCount++;
+                            
+                            // 检查是否达到停顿阈值
+                            if (silenceCount * windowSize >= silenceSamples) {
+                                const segmentEnd = silenceStart;
+                                const segment = this.extractSegment(audioBuffer, segmentStart, segmentEnd);
+                                if (segment) {
+                                    segments.push(segment);
+                                }
+                                segmentStart = null;
+                                silenceStart = null;
+                                silenceCount = 0;
+                            }
+                        }
+                    }
+                }
+                
+                // 处理最后一个片段
+                if (segmentStart !== null) {
+                    const segmentEnd = channelData.length;
+                    const segment = this.extractSegment(audioBuffer, segmentStart, segmentEnd);
+                    if (segment) {
+                        segments.push(segment);
+                    }
+                }
+                
+                return segments;
+            }
+
+            extractSegment(audioBuffer, startSample, endSample) {
+                const length = endSample - startSample;
+                
+                // 过滤太短的片段 (小于0.2秒)
+                if (length < audioBuffer.sampleRate * 0.2) {
+                    return null;
+                }
+                
+                const numberOfChannels = audioBuffer.numberOfChannels;
+                const segmentBuffer = this.audioContext.createBuffer(
+                    numberOfChannels,
+                    length,
+                    audioBuffer.sampleRate
+                );
+                
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const sourceData = audioBuffer.getChannelData(channel);
+                    const segmentData = segmentBuffer.getChannelData(channel);
+                    for (let i = 0; i < length; i++) {
+                        segmentData[i] = sourceData[startSample + i];
+                    }
+                }
+                
+                return segmentBuffer;
+            }
+
+            displaySegments() {
+                this.segmentList.innerHTML = '';
+                this.segmentsContainer.style.display = 'block';
+                this.emptyState.style.display = 'none';
+                this.segmentCount.textContent = this.segments.length;
+                
+                this.segments.forEach((segment, index) => {
+                    const duration = segment.duration.toFixed(2);
+                    
+                    const item = document.createElement('div');
+                    item.className = 'segment-item';
+                    
+                    item.innerHTML = `
+                        <div class="segment-number">#${index + 1}</div>
+                        <div class="segment-duration">${duration}秒</div>
+                        <div class="waveform">
+                            <div class="waveform-fill" id="waveform-${index}"></div>
+                        </div>
+                        <button class="play-btn" data-index="${index}">播放</button>
+                    `;
+                    
+                    const playBtn = item.querySelector('.play-btn');
+                    playBtn.addEventListener('click', () => this.playSegment(index, playBtn));
+                    
+                    this.segmentList.appendChild(item);
+                });
+            }
+
+            async playSegment(index, button) {
+                // 停止当前播放
+                if (this.currentlyPlaying) {
+                    this.currentlyPlaying.source.stop();
+                    this.currentlyPlaying.button.textContent = '播放';
+                    this.currentlyPlaying.button.classList.remove('playing');
+                    const prevWaveformFill = document.getElementById(`waveform-${this.currentlyPlaying.index}`);
+                    if (prevWaveformFill) {
+                        prevWaveformFill.style.width = '0%';
+                    }
+                }
+                
+                const segment = this.segments[index];
+                const source = this.audioContext.createBufferSource();
+                source.buffer = segment;
+                source.connect(this.audioContext.destination);
+                
+                button.textContent = '播放中...';
+                button.classList.add('playing');
+                
+                const waveformFill = document.getElementById(`waveform-${index}`);
+                const duration = segment.duration * 1000;
+                let startTime = Date.now();
+                
+                const updateProgress = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min((elapsed / duration) * 100, 100);
+                    waveformFill.style.width = progress + '%';
+                    
+                    if (progress < 100 && this.currentlyPlaying && this.currentlyPlaying.index === index) {
+                        requestAnimationFrame(updateProgress);
+                    }
+                };
+                
+                source.onended = () => {
+                    button.textContent = '播放';
+                    button.classList.remove('playing');
+                    waveformFill.style.width = '0%';
+                    if (this.currentlyPlaying && this.currentlyPlaying.index === index) {
+                        this.currentlyPlaying = null;
+                    }
+                };
+                
+                this.currentlyPlaying = { source, button, index };
+                source.start();
+                requestAnimationFrame(updateProgress);
+            }
+        }
+
+        // 初始化应用
+        const recorder = new VoiceRecorder();
+    </script>
+</body>
+</html>
+
