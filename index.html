@@ -798,6 +798,75 @@
                 
                 // 设置面板展开/折叠
                 this.settingsHeader.addEventListener('click', () => this.toggleSettings());
+                
+                // 监听页面可见性变化，处理锁屏问题
+                document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
+            }
+            
+            handleVisibilityChange() {
+                if (document.hidden) {
+                    // 页面被隐藏（锁屏或切换标签页）
+                    console.log('页面被隐藏');
+                    
+                    // 如果正在录音，记录状态但继续录音
+                    if (this.isRecording && this.mediaRecorder) {
+                        console.log('录音进行中，页面被隐藏');
+                    }
+                } else {
+                    // 页面恢复可见
+                    console.log('页面恢复可见');
+                    
+                    // 检查录音状态
+                    if (this.isRecording && this.mediaRecorder) {
+                        if (this.mediaRecorder.state === 'inactive') {
+                            // MediaRecorder已停止，需要提示用户
+                            console.warn('录音已中断');
+                            this.handleRecordingInterrupted();
+                        } else if (this.mediaRecorder.state === 'paused') {
+                            // MediaRecorder被暂停，尝试恢复
+                            try {
+                                this.mediaRecorder.resume();
+                                console.log('恢复录音');
+                            } catch (e) {
+                                console.error('恢复录音失败:', e);
+                                this.handleRecordingInterrupted();
+                            }
+                        } else {
+                            // 录音正常进行
+                            console.log('录音状态正常');
+                        }
+                    }
+                    
+                    // 如果AudioContext被挂起，恢复它
+                    if (this.audioContext && this.audioContext.state === 'suspended') {
+                        this.audioContext.resume().then(() => {
+                            console.log('AudioContext已恢复');
+                        }).catch(e => {
+                            console.error('恢复AudioContext失败:', e);
+                        });
+                    }
+                }
+            }
+            
+            handleRecordingInterrupted() {
+                // 录音被中断，清理状态
+                this.isRecording = false;
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                
+                // 停止波形动画
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+                
+                // 隐藏可视化容器
+                this.visualizerContainer.classList.remove('active');
+                
+                this.updateStatus('⚠️ 录音已中断，请重新开始录制', 'idle');
+                
+                // 提示用户
+                alert('录音在锁屏期间被中断，请重新开始录制');
             }
             
             toggleSettings() {
@@ -1118,6 +1187,22 @@
 
                     this.mediaRecorder.onstop = () => {
                         this.processRecording();
+                    };
+
+                    // 监听录音错误
+                    this.mediaRecorder.onerror = (event) => {
+                        console.error('MediaRecorder错误:', event.error);
+                        this.handleRecordingInterrupted();
+                    };
+
+                    // 监听录音暂停（某些浏览器在锁屏时会暂停）
+                    this.mediaRecorder.onpause = () => {
+                        console.warn('录音被暂停');
+                    };
+
+                    // 监听录音恢复
+                    this.mediaRecorder.onresume = () => {
+                        console.log('录音已恢复');
                     };
 
                     this.mediaRecorder.start();
