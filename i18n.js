@@ -70,6 +70,8 @@ const i18n = {
             voiceControlOff: '语音控制已关闭',
             voiceControlListening: '正在监听...',
             voiceControlWaiting: '等待语音命令...',
+            voiceControlPaused: '语音控制已暂停（播放中）',
+            voiceControlPausedDetail: '⏸️ 播放音频中，语音识别暂停...',
             
             commandsTitle: '可用命令：',
             commandStart: '开始 - 开始听写',
@@ -128,6 +130,8 @@ const i18n = {
             voiceControlOff: 'Voice control off',
             voiceControlListening: 'Listening...',
             voiceControlWaiting: 'Waiting for command...',
+            voiceControlPaused: 'Voice control paused (playing)',
+            voiceControlPausedDetail: '⏸️ Playing audio, voice recognition paused...',
             
             commandsTitle: 'Available Commands:',
             commandStart: 'Start - Begin dictation',
@@ -186,6 +190,8 @@ const i18n = {
             voiceControlOff: '音声コントロールオフ',
             voiceControlListening: '聞いています...',
             voiceControlWaiting: 'コマンド待機中...',
+            voiceControlPaused: '音声コントロール一時停止（再生中）',
+            voiceControlPausedDetail: '⏸️ オーディオ再生中、音声認識を一時停止...',
             
             commandsTitle: '使用可能なコマンド：',
             commandStart: '開始 - 聴写を開始',
@@ -244,6 +250,8 @@ const i18n = {
             voiceControlOff: 'Contrôle vocal désactivé',
             voiceControlListening: 'Écoute...',
             voiceControlWaiting: 'En attente de commande...',
+            voiceControlPaused: 'Contrôle vocal en pause (lecture)',
+            voiceControlPausedDetail: '⏸️ Lecture audio, reconnaissance vocale en pause...',
             
             commandsTitle: 'Commandes disponibles :',
             commandStart: 'Commencer - Démarrer la dictée',
@@ -302,6 +310,8 @@ const i18n = {
             voiceControlOff: 'Sprachsteuerung aus',
             voiceControlListening: 'Hört zu...',
             voiceControlWaiting: 'Warten auf Befehl...',
+            voiceControlPaused: 'Sprachsteuerung pausiert (Wiedergabe)',
+            voiceControlPausedDetail: '⏸️ Audio wird abgespielt, Spracherkennung pausiert...',
             
             commandsTitle: 'Verfügbare Befehle:',
             commandStart: 'Start - Diktat beginnen',
@@ -360,6 +370,8 @@ const i18n = {
             voiceControlOff: 'Control por voz desactivado',
             voiceControlListening: 'Escuchando...',
             voiceControlWaiting: 'Esperando comando...',
+            voiceControlPaused: 'Control por voz pausado (reproduciendo)',
+            voiceControlPausedDetail: '⏸️ Reproduciendo audio, reconocimiento de voz pausado...',
             
             commandsTitle: 'Comandos disponibles:',
             commandStart: 'Empezar - Iniciar dictado',
@@ -418,6 +430,8 @@ const i18n = {
             voiceControlOff: '음성 제어 꺼짐',
             voiceControlListening: '듣는 중...',
             voiceControlWaiting: '명령 대기 중...',
+            voiceControlPaused: '음성 제어 일시 정지됨 (재생 중)',
+            voiceControlPausedDetail: '⏸️ 오디오 재생 중, 음성 인식 일시 정지...',
             
             commandsTitle: '사용 가능한 명령:',
             commandStart: '시작 - 받아쓰기 시작',
@@ -476,6 +490,8 @@ const i18n = {
             voiceControlOff: 'Голосовое управление выключено',
             voiceControlListening: 'Слушаю...',
             voiceControlWaiting: 'Ожидание команды...',
+            voiceControlPaused: 'Голосовое управление приостановлено (воспроизведение)',
+            voiceControlPausedDetail: '⏸️ Воспроизведение аудио, распознавание речи приостановлено...',
             
             commandsTitle: 'Доступные команды:',
             commandStart: 'Начать - Начать диктант',
