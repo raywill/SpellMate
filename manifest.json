@@ -1,0 +1,18 @@
+{
+  "name": "听写助手",
+  "short_name": "听写助手",
+  "description": "智能语音听写工具，支持录音分段和语音控制",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "favicon-128.ico",
+      "sizes": "128x128",
+      "type": "image/x-icon"
+    }
+  ]
+}
+
