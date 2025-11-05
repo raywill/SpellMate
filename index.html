@@ -358,32 +358,36 @@
         }
 
         .lang-btn {
-            padding: 6px 12px;
+            padding: 4px 8px;
             background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 14px;
+            font-size: 12px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            box-shadow: none;
+            font-weight: 400;
         }
 
         .lang-btn:hover {
             border-color: #667eea;
-            background: #f3f4f6;
+            background: #f9fafb;
+            box-shadow: none;
+            transform: none;
         }
 
         .lang-btn.active {
             border-color: #667eea;
-            background: #667eea;
-            color: white;
-            font-weight: 600;
+            background: #ede9fe;
+            color: #5b21b6;
+            font-weight: 500;
         }
 
         .lang-btn .flag {
-            font-size: 18px;
+            font-size: 14px;
         }
 
         .empty-state {
@@ -1114,7 +1118,7 @@
                 if (!SpeechRecognition) {
                     console.warn('浏览器不支持语音识别');
                     this.voiceControlBtn.disabled = true;
-                    this.voiceControlBtn.textContent = '不支持语音识别';
+                    this.voiceControlBtn.textContent = i18n.t('errorSpeechNotSupported');
                     return;
                 }
 
@@ -1149,7 +1153,7 @@
                     
                     // 这些错误需要停止语音控制
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                        this.recognitionText.textContent = '❌ 麦克风权限被拒绝';
+                        this.recognitionText.textContent = `❌ ${i18n.t('errorMicPermissionDenied')}`;
                         this.stopVoiceControl();
                         alert(i18n.t('alertMicPermission'));
                         return;
@@ -1157,12 +1161,12 @@
                     
                     // 网络错误或其他错误，显示但继续尝试
                     if (event.error === 'network') {
-                        this.recognitionText.textContent = '⚠️ 网络连接问题';
+                        this.recognitionText.textContent = `⚠️ ${i18n.t('errorNetworkIssue')}`;
                         this.recognitionRestartCount++;
                         return;
                     }
                     
-                    this.recognitionText.textContent = '⚠️ 识别错误: ' + event.error;
+                    this.recognitionText.textContent = `⚠️ ${i18n.t('errorRecognition')}: ${event.error}`;
                     this.recognitionRestartCount++;
                 };
 
@@ -1178,7 +1182,7 @@
                         // 检查重启次数，防止无限循环
                         if (this.recognitionRestartCount >= this.maxRestartAttempts) {
                             console.warn('语音识别重启次数过多，停止自动重启');
-                            this.recognitionText.textContent = '⚠️ 识别服务异常，请重新开启';
+                            this.recognitionText.textContent = `⚠️ ${i18n.t('errorSpeechServiceAbnormal')}`;
                             this.stopVoiceControl();
                             return;
                         }
@@ -1864,7 +1868,7 @@
                     
                     item.innerHTML = `
                         <div class="segment-number">#${index + 1}</div>
-                        <div class="segment-duration">${duration}秒</div>
+                        <div class="segment-duration">${duration}${i18n.t('secondUnit')}</div>
                         <div class="waveform">
                             <div class="waveform-fill" id="waveform-${index}"></div>
                         </div>
