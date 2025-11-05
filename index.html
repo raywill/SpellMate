@@ -1349,7 +1349,7 @@
 
                     if (this.segments.length > 0) {
                         this.displaySegments();
-                        this.updateStatus(`✅ 已恢复 ${this.segments.length} 个片段（${new Date(data.timestamp).toLocaleString()}）`, 'ready');
+                        this.updateStatus(`✅ 已恢复 ${this.segments.length} 个片段`, 'ready');
                         this.voiceControl.classList.add('active');
                         // 启用语音控制按钮
                         this.updateVoiceControlButton();
