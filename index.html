@@ -262,11 +262,106 @@
             font-size: 14px;
             margin-top: 10px;
         }
+
+        .voice-control {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .voice-control.active {
+            display: block;
+        }
+
+        .voice-control h3 {
+            color: #065f46;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .voice-control-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .voice-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .voice-indicator .pulse {
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .voice-indicator.inactive .pulse {
+            background: #9ca3af;
+            animation: none;
+        }
+
+        .voice-indicator.inactive {
+            color: #6b7280;
+        }
+
+        #voiceControlBtn {
+            padding: 8px 20px;
+            font-size: 14px;
+        }
+
+        .voice-commands {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .voice-commands strong {
+            color: #059669;
+        }
+
+        .current-playing {
+            background: #dbeafe !important;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .recognition-text {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            min-height: 30px;
+            color: #1f2937;
+            font-style: italic;
+        }
+
+        .recognition-text.empty {
+            color: #9ca3af;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎙️ 语音录制与分段播放</h1>
+        <h1>🎙️ 语音听写助手</h1>
         
         <div class="controls">
             <button id="startBtn">开始录制</button>
@@ -278,6 +373,25 @@
         <div class="visualizer-container" id="visualizerContainer">
             <canvas id="audioVisualizer"></canvas>
             <div class="visualizer-label">🎵 实时音频波形</div>
+        </div>
+
+        <div class="voice-control" id="voiceControl">
+            <h3>🎤 语音控制听写</h3>
+            <div class="voice-control-status">
+                <div class="voice-indicator inactive" id="voiceIndicator">
+                    <div class="pulse"></div>
+                    <span id="voiceStatus">语音控制已关闭</span>
+                </div>
+                <button id="voiceControlBtn" class="play-btn">开启语音控制</button>
+            </div>
+            <div class="recognition-text empty" id="recognitionText">等待语音命令...</div>
+            <div class="voice-commands">
+                <strong>📝 可用命令：</strong><br>
+                • <strong>下一个/下一题/好的/写好了/继续/下一句/对了</strong> - 播放下一个片段<br>
+                • <strong>重播/再说一遍/再来一次/什么/没听清</strong> - 重新播放当前片段<br>
+                • <strong>上一个/上一题/回退/返回</strong> - 播放上一个片段<br>
+                <small>💡 每个片段会自动连播两次，停顿0.3秒</small>
+            </div>
         </div>
 
         <div class="settings">
@@ -319,9 +433,16 @@
                 this.animationId = null;
                 this.dataArray = null;
                 
+                // 语音控制相关
+                this.recognition = null;
+                this.isVoiceControlActive = false;
+                this.currentPlayingIndex = -1; // 当前播放的片段索引
+                this.lastManualClickIndex = -1; // 最后一次手动点击的索引
+                
                 this.initElements();
                 this.initEventListeners();
                 this.initCanvas();
+                this.initSpeechRecognition();
             }
 
             initElements() {
@@ -339,6 +460,13 @@
                 this.visualizerContainer = document.getElementById('visualizerContainer');
                 this.canvas = document.getElementById('audioVisualizer');
                 this.canvasCtx = this.canvas.getContext('2d');
+                
+                // 语音控制元素
+                this.voiceControl = document.getElementById('voiceControl');
+                this.voiceControlBtn = document.getElementById('voiceControlBtn');
+                this.voiceIndicator = document.getElementById('voiceIndicator');
+                this.voiceStatus = document.getElementById('voiceStatus');
+                this.recognitionText = document.getElementById('recognitionText');
             }
 
             initCanvas() {
@@ -361,6 +489,122 @@
                     this.volumeThreshold = parseFloat(e.target.value);
                     this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
                 });
+
+                // 语音控制按钮
+                this.voiceControlBtn.addEventListener('click', () => this.toggleVoiceControl());
+            }
+
+            initSpeechRecognition() {
+                // 检查浏览器是否支持语音识别
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    console.warn('浏览器不支持语音识别');
+                    this.voiceControlBtn.disabled = true;
+                    this.voiceControlBtn.textContent = '不支持语音识别';
+                    return;
+                }
+
+                this.recognition = new SpeechRecognition();
+                this.recognition.lang = 'zh-CN';
+                this.recognition.continuous = true;
+                this.recognition.interimResults = true;
+
+                this.recognition.onresult = (event) => {
+                    const last = event.results.length - 1;
+                    const transcript = event.results[last][0].transcript.trim();
+                    
+                    // 显示识别的文字
+                    this.recognitionText.textContent = transcript;
+                    this.recognitionText.classList.remove('empty');
+                    
+                    // 只处理最终结果
+                    if (event.results[last].isFinal) {
+                        this.handleVoiceCommand(transcript);
+                    }
+                };
+
+                this.recognition.onerror = (event) => {
+                    console.error('语音识别错误:', event.error);
+                    if (event.error === 'no-speech') {
+                        // 没有检测到语音，继续监听
+                        return;
+                    }
+                    this.recognitionText.textContent = '识别错误: ' + event.error;
+                };
+
+                this.recognition.onend = () => {
+                    // 如果语音控制还在激活状态，自动重启
+                    if (this.isVoiceControlActive) {
+                        setTimeout(() => {
+                            try {
+                                this.recognition.start();
+                            } catch (e) {
+                                console.log('重启识别失败:', e);
+                            }
+                        }, 100);
+                    }
+                };
+            }
+
+            toggleVoiceControl() {
+                if (this.segments.length === 0) {
+                    alert('请先录制并生成片段');
+                    return;
+                }
+
+                if (this.isVoiceControlActive) {
+                    this.stopVoiceControl();
+                } else {
+                    this.startVoiceControl();
+                }
+            }
+
+            startVoiceControl() {
+                try {
+                    this.recognition.start();
+                    this.isVoiceControlActive = true;
+                    this.voiceControlBtn.textContent = '关闭语音控制';
+                    this.voiceIndicator.classList.remove('inactive');
+                    this.voiceStatus.textContent = '正在监听...';
+                    this.recognitionText.textContent = '等待语音命令...';
+                    this.recognitionText.classList.add('empty');
+                } catch (e) {
+                    console.error('启动语音识别失败:', e);
+                    alert('无法启动语音识别');
+                }
+            }
+
+            stopVoiceControl() {
+                if (this.recognition) {
+                    this.recognition.stop();
+                }
+                this.isVoiceControlActive = false;
+                this.voiceControlBtn.textContent = '开启语音控制';
+                this.voiceIndicator.classList.add('inactive');
+                this.voiceStatus.textContent = '语音控制已关闭';
+                this.recognitionText.textContent = '等待语音命令...';
+                this.recognitionText.classList.add('empty');
+            }
+
+            handleVoiceCommand(command) {
+                console.log('语音命令:', command);
+                
+                // 播放下一个的命令
+                const nextCommands = ['下一个', '下一题', '好的', '写好了', '继续', '下一句', '对了', '好了', '完成', '知道了'];
+                // 重播的命令
+                const replayCommands = ['重播', '再说一遍', '再来一次', '什么', '没听清', '再听', '听不清', '重复', '重来'];
+                // 上一个的命令
+                const prevCommands = ['上一个', '上一题', '回退', '返回', '上一句', '前一个'];
+                
+                const lowerCommand = command.toLowerCase();
+                
+                if (nextCommands.some(cmd => lowerCommand.includes(cmd))) {
+                    this.playNext();
+                } else if (replayCommands.some(cmd => lowerCommand.includes(cmd))) {
+                    this.replayCurrent();
+                } else if (prevCommands.some(cmd => lowerCommand.includes(cmd))) {
+                    this.playPrevious();
+                }
             }
 
             updateStatus(message, className) {
@@ -479,6 +723,96 @@
                 this.canvasCtx.stroke();
             }
 
+            playNext() {
+                if (this.currentlyPlaying) {
+                    // 等待当前播放完成
+                    return;
+                }
+
+                let nextIndex;
+                if (this.lastManualClickIndex >= 0) {
+                    // 如果有手动点击记录，从那个位置的下一个开始
+                    nextIndex = this.lastManualClickIndex + 1;
+                } else if (this.currentPlayingIndex >= 0) {
+                    nextIndex = this.currentPlayingIndex + 1;
+                } else {
+                    nextIndex = 0;
+                }
+
+                if (nextIndex >= this.segments.length) {
+                    // 播放完毕，播放提示音
+                    this.playCompletionSound();
+                    this.currentPlayingIndex = -1;
+                    this.lastManualClickIndex = -1;
+                    return;
+                }
+
+                const button = document.querySelector(`[data-index="${nextIndex}"]`);
+                if (button) {
+                    this.playSegmentTwice(nextIndex, button);
+                    this.lastManualClickIndex = nextIndex;
+                }
+            }
+
+            replayCurrent() {
+                if (this.currentlyPlaying) {
+                    // 如果正在播放，先停止
+                    this.currentlyPlaying.source.stop();
+                }
+
+                const index = this.lastManualClickIndex >= 0 ? this.lastManualClickIndex : this.currentPlayingIndex;
+                if (index < 0 || index >= this.segments.length) {
+                    // 如果没有当前片段，播放第一个
+                    this.playNext();
+                    return;
+                }
+
+                const button = document.querySelector(`[data-index="${index}"]`);
+                if (button) {
+                    this.playSegmentTwice(index, button);
+                }
+            }
+
+            playPrevious() {
+                if (this.currentlyPlaying) {
+                    return;
+                }
+
+                const currentIndex = this.lastManualClickIndex >= 0 ? this.lastManualClickIndex : this.currentPlayingIndex;
+                const prevIndex = currentIndex - 1;
+
+                if (prevIndex < 0) {
+                    // 已经是第一个，播放提示
+                    this.playCompletionSound();
+                    return;
+                }
+
+                const button = document.querySelector(`[data-index="${prevIndex}"]`);
+                if (button) {
+                    this.playSegmentTwice(prevIndex, button);
+                    this.lastManualClickIndex = prevIndex;
+                }
+            }
+
+            playCompletionSound() {
+                // 生成一个简单的提示音（440Hz 正弦波）
+                const audioContext = this.audioContext;
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 440; // A4音
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            }
+
             async processRecording() {
                 const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
                 const arrayBuffer = await audioBlob.arrayBuffer();
@@ -491,6 +825,8 @@
                 if (this.segments.length > 0) {
                     this.displaySegments();
                     this.updateStatus(`✅ 录音完成,已分割为 ${this.segments.length} 个片段`, 'ready');
+                    // 显示语音控制区域
+                    this.voiceControl.classList.add('active');
                 } else {
                     this.updateStatus('⚠️ 未检测到有效语音片段', 'idle');
                 }
@@ -601,6 +937,7 @@
                     
                     const item = document.createElement('div');
                     item.className = 'segment-item';
+                    item.id = `segment-item-${index}`;
                     
                     item.innerHTML = `
                         <div class="segment-number">#${index + 1}</div>
@@ -612,13 +949,31 @@
                     `;
                     
                     const playBtn = item.querySelector('.play-btn');
-                    playBtn.addEventListener('click', () => this.playSegment(index, playBtn));
+                    playBtn.addEventListener('click', () => {
+                        this.lastManualClickIndex = index;
+                        this.playSegmentTwice(index, playBtn);
+                    });
                     
                     this.segmentList.appendChild(item);
                 });
             }
 
-            async playSegment(index, button) {
+            updateCurrentPlayingUI(index) {
+                // 移除之前的高亮
+                document.querySelectorAll('.segment-item').forEach(item => {
+                    item.classList.remove('current-playing');
+                });
+                
+                // 添加当前高亮
+                if (index >= 0) {
+                    const item = document.getElementById(`segment-item-${index}`);
+                    if (item) {
+                        item.classList.add('current-playing');
+                    }
+                }
+            }
+
+            async playSegmentTwice(index, button) {
                 // 停止当前播放
                 if (this.currentlyPlaying) {
                     this.currentlyPlaying.source.stop();
@@ -629,42 +984,65 @@
                         prevWaveformFill.style.width = '0%';
                     }
                 }
+
+                this.currentPlayingIndex = index;
+                this.updateCurrentPlayingUI(index);
+
+                // 第一次播放
+                await this.playSegmentOnce(index, button);
                 
-                const segment = this.segments[index];
-                const source = this.audioContext.createBufferSource();
-                source.buffer = segment;
-                source.connect(this.audioContext.destination);
+                // 等待0.3秒
+                await new Promise(resolve => setTimeout(resolve, 300));
                 
-                button.textContent = '播放中...';
-                button.classList.add('playing');
+                // 第二次播放
+                await this.playSegmentOnce(index, button);
                 
-                const waveformFill = document.getElementById(`waveform-${index}`);
-                const duration = segment.duration * 1000;
-                let startTime = Date.now();
-                
-                const updateProgress = () => {
-                    const elapsed = Date.now() - startTime;
-                    const progress = Math.min((elapsed / duration) * 100, 100);
-                    waveformFill.style.width = progress + '%';
-                    
-                    if (progress < 100 && this.currentlyPlaying && this.currentlyPlaying.index === index) {
-                        requestAnimationFrame(updateProgress);
-                    }
-                };
-                
-                source.onended = () => {
-                    button.textContent = '播放';
-                    button.classList.remove('playing');
-                    waveformFill.style.width = '0%';
-                    if (this.currentlyPlaying && this.currentlyPlaying.index === index) {
-                        this.currentlyPlaying = null;
-                    }
-                };
-                
-                this.currentlyPlaying = { source, button, index };
-                source.start();
-                requestAnimationFrame(updateProgress);
+                // 播放完成后清除状态
+                this.updateCurrentPlayingUI(-1);
             }
+
+            playSegmentOnce(index, button) {
+                return new Promise((resolve) => {
+                    const segment = this.segments[index];
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = segment;
+                    source.connect(this.audioContext.destination);
+                    
+                    button.textContent = '播放中...';
+                    button.classList.add('playing');
+                    
+                    const waveformFill = document.getElementById(`waveform-${index}`);
+                    const duration = segment.duration * 1000;
+                    let startTime = Date.now();
+                    
+                    const updateProgress = () => {
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min((elapsed / duration) * 100, 100);
+                        if (waveformFill) {
+                            waveformFill.style.width = progress + '%';
+                        }
+                        
+                        if (progress < 100) {
+                            requestAnimationFrame(updateProgress);
+                        }
+                    };
+                    
+                    source.onended = () => {
+                        button.textContent = '播放';
+                        button.classList.remove('playing');
+                        if (waveformFill) {
+                            waveformFill.style.width = '0%';
+                        }
+                        this.currentlyPlaying = null;
+                        resolve();
+                    };
+                    
+                    this.currentlyPlaying = { source, button, index };
+                    source.start();
+                    requestAnimationFrame(updateProgress);
+                });
+            }
+
         }
 
         // 初始化应用
