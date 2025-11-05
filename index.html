@@ -1481,12 +1481,14 @@
                 // 停止当前播放
                 if (this.currentlyPlaying) {
                     this.currentlyPlaying.source.stop();
-                    this.currentlyPlaying.button.textContent = '播放';
                     this.currentlyPlaying.button.classList.remove('playing');
-                    const prevWaveformFill = document.getElementById(`waveform-${this.currentlyPlaying.index}`);
-                    if (prevWaveformFill) {
-                        prevWaveformFill.style.width = '0%';
-                    }
+                    // 不重置之前片段的进度条，保持100%显示已播放状态
+                }
+
+                // 重置当前片段的进度条为0%，准备开始播放
+                const currentWaveformFill = document.getElementById(`waveform-${index}`);
+                if (currentWaveformFill) {
+                    currentWaveformFill.style.width = '0%';
                 }
 
                 this.currentPlayingIndex = index;
@@ -1512,7 +1514,7 @@
                     source.buffer = segment;
                     source.connect(this.audioContext.destination);
                     
-                    button.textContent = '播放中...';
+                    // 只改变样式，不改变文字
                     button.classList.add('playing');
                     
                     const waveformFill = document.getElementById(`waveform-${index}`);
@@ -1532,18 +1534,14 @@
                     };
                     
                     source.onended = () => {
-                        // 先确保进度条显示100%
+                        // 确保进度条显示100%并保持
                         if (waveformFill) {
                             waveformFill.style.width = '100%';
                         }
                         
-                        // 延迟150ms后再重置，让用户看到完成状态
+                        // 延迟后移除播放状态（但保持进度条100%）
                         setTimeout(() => {
-                            button.textContent = '播放';
                             button.classList.remove('playing');
-                            if (waveformFill) {
-                                waveformFill.style.width = '0%';
-                            }
                         }, 150);
                         
                         this.currentlyPlaying = null;
