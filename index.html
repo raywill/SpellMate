@@ -1532,11 +1532,20 @@
                     };
                     
                     source.onended = () => {
-                        button.textContent = '播放';
-                        button.classList.remove('playing');
+                        // 先确保进度条显示100%
                         if (waveformFill) {
-                            waveformFill.style.width = '0%';
+                            waveformFill.style.width = '100%';
                         }
+                        
+                        // 延迟150ms后再重置，让用户看到完成状态
+                        setTimeout(() => {
+                            button.textContent = '播放';
+                            button.classList.remove('playing');
+                            if (waveformFill) {
+                                waveformFill.style.width = '0%';
+                            }
+                        }, 150);
+                        
                         this.currentlyPlaying = null;
                         resolve();
                     };
