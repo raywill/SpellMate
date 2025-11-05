@@ -382,7 +382,7 @@
                     <div class="pulse"></div>
                     <span id="voiceStatus">语音控制已关闭</span>
                 </div>
-                <button id="voiceControlBtn" class="play-btn">开启语音控制</button>
+                <button id="voiceControlBtn" class="play-btn">开始听写</button>
             </div>
             <div class="recognition-text empty" id="recognitionText">等待语音命令...</div>
             <div class="voice-commands">
@@ -438,11 +438,14 @@
                 this.isVoiceControlActive = false;
                 this.currentPlayingIndex = -1; // 当前播放的片段索引
                 this.lastManualClickIndex = -1; // 最后一次手动点击的索引
+                this.recognitionRestartCount = 0; // 重启计数器
+                this.maxRestartAttempts = 3; // 最大重启次数
                 
                 this.initElements();
                 this.initEventListeners();
                 this.initCanvas();
                 this.initSpeechRecognition();
+                this.loadFromLocalStorage();
             }
 
             initElements() {
@@ -519,27 +522,59 @@
                     
                     // 只处理最终结果
                     if (event.results[last].isFinal) {
+                        // 收到结果说明识别服务正常，重置错误计数
+                        this.recognitionRestartCount = 0;
                         this.handleVoiceCommand(transcript);
                     }
                 };
 
                 this.recognition.onerror = (event) => {
                     console.error('语音识别错误:', event.error);
-                    if (event.error === 'no-speech') {
-                        // 没有检测到语音，继续监听
+                    
+                    // 这些错误可以忽略，不影响继续监听
+                    if (event.error === 'no-speech' || event.error === 'aborted') {
                         return;
                     }
-                    this.recognitionText.textContent = '识别错误: ' + event.error;
+                    
+                    // 这些错误需要停止语音控制
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        this.recognitionText.textContent = '❌ 麦克风权限被拒绝';
+                        this.stopVoiceControl();
+                        alert('请允许麦克风权限以使用语音控制功能');
+                        return;
+                    }
+                    
+                    // 网络错误或其他错误，显示但继续尝试
+                    if (event.error === 'network') {
+                        this.recognitionText.textContent = '⚠️ 网络连接问题';
+                        this.recognitionRestartCount++;
+                        return;
+                    }
+                    
+                    this.recognitionText.textContent = '⚠️ 识别错误: ' + event.error;
+                    this.recognitionRestartCount++;
                 };
 
                 this.recognition.onend = () => {
                     // 如果语音控制还在激活状态，自动重启
                     if (this.isVoiceControlActive) {
+                        // 检查重启次数，防止无限循环
+                        if (this.recognitionRestartCount >= this.maxRestartAttempts) {
+                            console.warn('语音识别重启次数过多，停止自动重启');
+                            this.recognitionText.textContent = '⚠️ 识别服务异常，请重新开启';
+                            this.stopVoiceControl();
+                            return;
+                        }
+                        
                         setTimeout(() => {
                             try {
                                 this.recognition.start();
                             } catch (e) {
                                 console.log('重启识别失败:', e);
+                                // 如果是 "already started" 错误，不计入重启次数
+                                if (e.message && !e.message.includes('already')) {
+                                    this.recognitionRestartCount++;
+                                }
                             }
                         }, 100);
                     }
@@ -561,6 +596,9 @@
 
             startVoiceControl() {
                 try {
+                    // 重置重启计数器
+                    this.recognitionRestartCount = 0;
+                    
                     this.recognition.start();
                     this.isVoiceControlActive = true;
                     this.voiceControlBtn.textContent = '关闭语音控制';
@@ -568,29 +606,54 @@
                     this.voiceStatus.textContent = '正在监听...';
                     this.recognitionText.textContent = '等待语音命令...';
                     this.recognitionText.classList.add('empty');
+                    
+                    console.log('语音控制已启动');
                 } catch (e) {
                     console.error('启动语音识别失败:', e);
-                    alert('无法启动语音识别');
+                    this.isVoiceControlActive = false;
+                    
+                    // 如果是因为已经在运行，尝试先停止再启动
+                    if (e.message && e.message.includes('already')) {
+                        try {
+                            this.recognition.stop();
+                            setTimeout(() => {
+                                this.startVoiceControl();
+                            }, 200);
+                        } catch (e2) {
+                            alert('无法启动语音识别：' + e2.message);
+                        }
+                    } else if (e.message && e.message.includes('not-allowed')) {
+                        alert('请允许麦克风权限以使用语音控制功能');
+                    } else {
+                        alert('无法启动语音识别：' + e.message);
+                    }
                 }
             }
 
             stopVoiceControl() {
                 if (this.recognition) {
-                    this.recognition.stop();
+                    try {
+                        this.recognition.stop();
+                    } catch (e) {
+                        console.log('停止语音识别时出错:', e);
+                    }
                 }
                 this.isVoiceControlActive = false;
-                this.voiceControlBtn.textContent = '开启语音控制';
+                this.recognitionRestartCount = 0; // 重置计数器
+                this.voiceControlBtn.textContent = '开始听写';
                 this.voiceIndicator.classList.add('inactive');
                 this.voiceStatus.textContent = '语音控制已关闭';
                 this.recognitionText.textContent = '等待语音命令...';
                 this.recognitionText.classList.add('empty');
+                
+                console.log('语音控制已关闭');
             }
 
             handleVoiceCommand(command) {
                 console.log('语音命令:', command);
                 
                 // 播放下一个的命令
-                const nextCommands = ['下一个', '下一题', '好的', '写好了', '继续', '下一句', '对了', '好了', '完成', '知道了'];
+                const nextCommands = ['下一个', '下一题', '好的', '写好了', '继续', '下一句', '对了', '好了', '完成', '知道了', '好', 'OK'];
                 // 重播的命令
                 const replayCommands = ['重播', '再说一遍', '再来一次', '什么', '没听清', '再听', '听不清', '重复', '重来'];
                 // 上一个的命令
@@ -598,12 +661,22 @@
                 
                 const lowerCommand = command.toLowerCase();
                 
+                let commandRecognized = false;
+                
                 if (nextCommands.some(cmd => lowerCommand.includes(cmd))) {
                     this.playNext();
+                    commandRecognized = true;
                 } else if (replayCommands.some(cmd => lowerCommand.includes(cmd))) {
                     this.replayCurrent();
+                    commandRecognized = true;
                 } else if (prevCommands.some(cmd => lowerCommand.includes(cmd))) {
                     this.playPrevious();
+                    commandRecognized = true;
+                }
+                
+                // 如果成功识别命令，重置错误计数器
+                if (commandRecognized) {
+                    this.recognitionRestartCount = 0;
                 }
             }
 
@@ -614,6 +687,17 @@
 
             async startRecording() {
                 try {
+                    // 清理 localStorage 和当前数据
+                    this.clearLocalStorage();
+                    this.segments = [];
+                    this.segmentList.innerHTML = '';
+                    this.segmentsContainer.style.display = 'none';
+                    this.emptyState.style.display = 'block';
+                    this.voiceControl.classList.remove('active');
+                    if (this.isVoiceControlActive) {
+                        this.stopVoiceControl();
+                    }
+                    
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     
                     // 设置音频可视化
@@ -742,8 +826,11 @@
                 if (nextIndex >= this.segments.length) {
                     // 播放完毕，播放提示音
                     this.playCompletionSound();
+                    // 将索引设置为 segments.length 表示"已超出结尾"状态
+                    // 这样下次说"下一个"还是会进入这个分支，继续播放提示音
+                    // 而说"上一个"时，prevIndex 会是 segments.length - 1，正好是最后一个片段
+                    this.lastManualClickIndex = this.segments.length;
                     this.currentPlayingIndex = -1;
-                    this.lastManualClickIndex = -1;
                     return;
                 }
 
@@ -782,7 +869,8 @@
                 const prevIndex = currentIndex - 1;
 
                 if (prevIndex < 0) {
-                    // 已经是第一个，播放提示
+                    // 已经是第一个，播放提示音
+                    // 不修改索引，保持当前位置，下次说"上一个"还是播放提示音
                     this.playCompletionSound();
                     return;
                 }
@@ -827,8 +915,104 @@
                     this.updateStatus(`✅ 录音完成,已分割为 ${this.segments.length} 个片段`, 'ready');
                     // 显示语音控制区域
                     this.voiceControl.classList.add('active');
+                    // 保存到 localStorage
+                    await this.saveToLocalStorage(audioBlob);
                 } else {
                     this.updateStatus('⚠️ 未检测到有效语音片段', 'idle');
+                }
+            }
+
+            async saveToLocalStorage(audioBlob) {
+                try {
+                    // 将 Blob 转为 base64
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    
+                    return new Promise((resolve, reject) => {
+                        reader.onload = () => {
+                            try {
+                                const data = {
+                                    audioData: reader.result,
+                                    timestamp: Date.now(),
+                                    segmentCount: this.segments.length,
+                                    silenceThreshold: this.silenceThreshold,
+                                    volumeThreshold: this.volumeThreshold
+                                };
+                                localStorage.setItem('voiceRecorderData', JSON.stringify(data));
+                                console.log('数据已保存到 localStorage');
+                                resolve();
+                            } catch (error) {
+                                console.error('保存到 localStorage 失败:', error);
+                                if (error.name === 'QuotaExceededError') {
+                                    alert('存储空间不足，无法保存录音数据');
+                                }
+                                reject(error);
+                            }
+                        };
+                        reader.onerror = reject;
+                    });
+                } catch (error) {
+                    console.error('保存数据失败:', error);
+                }
+            }
+
+            async loadFromLocalStorage() {
+                try {
+                    const savedData = localStorage.getItem('voiceRecorderData');
+                    if (!savedData) {
+                        console.log('没有找到保存的数据');
+                        return;
+                    }
+
+                    const data = JSON.parse(savedData);
+                    console.log('从 localStorage 加载数据...', {
+                        timestamp: new Date(data.timestamp),
+                        segmentCount: data.segmentCount
+                    });
+
+                    // 恢复参数设置
+                    if (data.silenceThreshold) {
+                        this.silenceThreshold = data.silenceThreshold;
+                        this.silenceThresholdInput.value = data.silenceThreshold;
+                        this.silenceValue.textContent = data.silenceThreshold.toFixed(1) + ' 秒';
+                    }
+                    if (data.volumeThreshold) {
+                        this.volumeThreshold = data.volumeThreshold;
+                        this.volumeThresholdInput.value = data.volumeThreshold;
+                        this.volumeValue.textContent = data.volumeThreshold.toFixed(3);
+                    }
+
+                    // 将 base64 转回 Blob
+                    const response = await fetch(data.audioData);
+                    const audioBlob = await response.blob();
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+
+                    // 创建 AudioContext 并解码音频
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+                    // 重新分割音频
+                    this.segments = this.splitAudioByPauses(audioBuffer);
+
+                    if (this.segments.length > 0) {
+                        this.displaySegments();
+                        this.updateStatus(`✅ 已恢复 ${this.segments.length} 个片段（${new Date(data.timestamp).toLocaleString()}）`, 'ready');
+                        this.voiceControl.classList.add('active');
+                        console.log('数据恢复成功');
+                    }
+                } catch (error) {
+                    console.error('从 localStorage 加载失败:', error);
+                    // 清理损坏的数据
+                    this.clearLocalStorage();
+                }
+            }
+
+            clearLocalStorage() {
+                try {
+                    localStorage.removeItem('voiceRecorderData');
+                    console.log('localStorage 已清理');
+                } catch (error) {
+                    console.error('清理 localStorage 失败:', error);
                 }
             }
 
@@ -901,10 +1085,17 @@
             }
 
             extractSegment(audioBuffer, startSample, endSample) {
-                const length = endSample - startSample;
+                const sampleRate = audioBuffer.sampleRate;
+                const padding = Math.floor(sampleRate * 0.1); // 0.1秒的缓冲
                 
-                // 过滤太短的片段 (小于0.2秒)
-                if (length < audioBuffer.sampleRate * 0.2) {
+                // 向前后扩展，但不超出边界
+                const actualStart = Math.max(0, startSample - padding);
+                const actualEnd = Math.min(audioBuffer.length, endSample + padding);
+                const length = actualEnd - actualStart;
+                
+                // 过滤太短的片段 (小于0.2秒，不包括缓冲)
+                const originalLength = endSample - startSample;
+                if (originalLength < sampleRate * 0.2) {
                     return null;
                 }
                 
@@ -912,14 +1103,14 @@
                 const segmentBuffer = this.audioContext.createBuffer(
                     numberOfChannels,
                     length,
-                    audioBuffer.sampleRate
+                    sampleRate
                 );
                 
                 for (let channel = 0; channel < numberOfChannels; channel++) {
                     const sourceData = audioBuffer.getChannelData(channel);
                     const segmentData = segmentBuffer.getChannelData(channel);
                     for (let i = 0; i < length; i++) {
-                        segmentData[i] = sourceData[startSample + i];
+                        segmentData[i] = sourceData[actualStart + i];
                     }
                 }
                 
@@ -992,7 +1183,7 @@
                 await this.playSegmentOnce(index, button);
                 
                 // 等待0.3秒
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // 第二次播放
                 await this.playSegmentOnce(index, button);
