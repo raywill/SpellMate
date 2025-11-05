@@ -29,6 +29,9 @@
     <!-- Web App Manifest -->
     <link rel="manifest" href="manifest.json">
     
+    <!-- i18n 多语言支持 -->
+    <script src="i18n.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -346,6 +349,41 @@
             font-weight: 600;
             min-width: 60px;
             text-align: right;
+        }
+
+        .language-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .lang-btn {
+            padding: 6px 12px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lang-btn:hover {
+            border-color: #667eea;
+            background: #f3f4f6;
+        }
+
+        .lang-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .lang-btn .flag {
+            font-size: 18px;
         }
 
         .empty-state {
@@ -667,6 +705,12 @@
                     <input type="range" id="volumeThreshold" min="0.001" max="0.05" step="0.001" value="0.01">
                     <span class="value" id="volumeValue">0.010</span>
                 </div>
+                <div class="setting-item" style="display: block;">
+                    <label style="display: block; margin-bottom: 10px;" data-i18n="settingLanguage">语言:</label>
+                    <div class="language-selector" id="languageSelector">
+                        <!-- 动态生成语言按钮 -->
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -733,10 +777,12 @@
                 this.isPausedForPlayback = false; // 播放时暂停识别的标志
                 
                 this.initElements();
+                this.initLanguageSelector(); // 初始化语言选择器
+                this.updateUI(); // 更新所有界面文本
                 this.initEventListeners();
                 this.initCanvas();
                 this.initSpeechRecognition();
-                this.loadSettings(); // 加载设置（需求3）
+                this.loadSettings(); // 加载设置
                 this.updateVoiceControlButton(); // 初始化按钮状态
                 this.loadFromLocalStorage();
             }
@@ -863,10 +909,152 @@
                 // 隐藏可视化容器
                 this.visualizerContainer.classList.remove('active');
                 
-                this.updateStatus('⚠️ 录音已中断，请重新开始录制', 'idle');
+                this.updateStatus(`⚠️ ${i18n.t('statusInterrupted')}`, 'idle');
                 
                 // 提示用户
-                alert('录音在锁屏期间被中断，请重新开始录制');
+                alert(i18n.t('alertRecordingInterrupted'));
+            }
+            
+            initLanguageSelector() {
+                const selector = document.getElementById('languageSelector');
+                if (!selector) return;
+                
+                // 生成语言按钮
+                i18n.getAllLanguages().forEach(lang => {
+                    const btn = document.createElement('button');
+                    btn.className = 'lang-btn';
+                    btn.dataset.lang = lang.code;
+                    if (lang.code === i18n.currentLanguage) {
+                        btn.classList.add('active');
+                    }
+                    
+                    btn.innerHTML = `
+                        <span class="flag">${lang.flag}</span>
+                        <span>${lang.name}</span>
+                    `;
+                    
+                    btn.addEventListener('click', () => this.switchLanguage(lang.code));
+                    selector.appendChild(btn);
+                });
+            }
+
+            switchLanguage(langCode) {
+                // 切换语言
+                i18n.setLanguage(langCode);
+                
+                // 更新语言按钮状态
+                document.querySelectorAll('.lang-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.lang === langCode);
+                });
+                
+                // 更新所有UI文本
+                this.updateUI();
+                
+                // 重新初始化语音识别（更新语言）
+                if (this.recognition) {
+                    const wasActive = this.isVoiceControlActive;
+                    if (wasActive) {
+                        this.stopVoiceControl();
+                    }
+                    this.initSpeechRecognition();
+                    if (wasActive && this.segments.length > 0) {
+                        // 如果之前在听写，自动重新开启
+                        setTimeout(() => this.startVoiceControl(), 300);
+                    }
+                }
+            }
+
+            updateUI() {
+                // 更新所有界面文本
+                
+                // 标题和按钮
+                document.querySelector('h1').textContent = `🎙️ ${i18n.t('appTitle')}`;
+                this.startBtn.textContent = i18n.t('startRecording');
+                this.stopBtn.textContent = i18n.t('stopRecording');
+                
+                // 初始状态
+                if (this.status.textContent === '准备就绪' || this.status.className.includes('idle')) {
+                    this.updateStatus(i18n.t('statusReady'), 'idle');
+                }
+                
+                // 波形标签
+                const visualizerLabel = document.querySelector('.visualizer-label');
+                if (visualizerLabel) {
+                    visualizerLabel.textContent = `🎵 ${i18n.t('visualizerLabel')}`;
+                }
+                
+                // 语音控制按钮
+                if (this.voiceControlBtn) {
+                    this.voiceControlBtn.textContent = this.isVoiceControlActive ? 
+                        i18n.t('pauseDictation') : i18n.t('startDictation');
+                }
+                
+                // 语音控制状态
+                if (this.voiceStatus) {
+                    this.voiceStatus.textContent = this.isVoiceControlActive ? 
+                        i18n.t('voiceControlListening') : i18n.t('voiceControlOff');
+                }
+                
+                // 识别文字
+                if (this.recognitionText && !this.recognitionText.classList.contains('empty')) {
+                    // 保持当前识别的文字
+                } else if (this.recognitionText) {
+                    this.recognitionText.textContent = i18n.t('voiceControlWaiting');
+                }
+                
+                // 语音命令说明
+                const commandsDiv = document.querySelector('.voice-commands');
+                if (commandsDiv) {
+                    commandsDiv.innerHTML = `
+                        <strong>${i18n.t('commandsTitle')}</strong><br>
+                        • <strong>${i18n.t('commandStart')}</strong><br>
+                        • <strong>${i18n.t('commandNext')}</strong><br>
+                        • <strong>${i18n.t('commandReplay')}</strong><br>
+                        • <strong>${i18n.t('commandPrevious')}</strong>
+                    `;
+                }
+                
+                // 高级设置
+                const settingsTitle = document.querySelector('.settings-header h3');
+                if (settingsTitle) settingsTitle.textContent = `⚙️ ${i18n.t('settingsTitle')}`;
+                
+                const settingLabels = document.querySelectorAll('.setting-item label');
+                if (settingLabels[0]) settingLabels[0].textContent = i18n.t('settingSilence');
+                if (settingLabels[1]) settingLabels[1].textContent = i18n.t('settingVolume');
+                
+                document.querySelector('[data-i18n="settingLanguage"]').textContent = i18n.t('settingLanguage');
+                
+                // 片段标题
+                const segmentsTitle = document.querySelector('#segmentsContainer h2');
+                if (segmentsTitle) {
+                    const count = this.segmentCount.textContent;
+                    segmentsTitle.innerHTML = `📝 ${i18n.t('segmentsTitle')} (<span id="segmentCount">${count}</span>)`;
+                }
+                
+                // 播放按钮
+                document.querySelectorAll('.play-btn').forEach(btn => {
+                    if (!btn.classList.contains('playing')) {
+                        btn.textContent = i18n.t('playButton');
+                    }
+                });
+                
+                // 空状态
+                if (this.emptyState) {
+                    this.emptyState.innerHTML = i18n.t('emptyState');
+                }
+                
+                // 微信提示
+                const wechatTitle = document.querySelector('.wechat-tip-title');
+                const wechatText = document.querySelector('.wechat-tip-text');
+                if (wechatTitle) wechatTitle.textContent = i18n.t('wechatTitle');
+                if (wechatText) wechatText.innerHTML = i18n.t('wechatText');
+                
+                const wechatSteps = document.querySelectorAll('.wechat-tip-steps li');
+                if (wechatSteps[0]) wechatSteps[0].innerHTML = i18n.t('wechatStep1');
+                if (wechatSteps[1]) wechatSteps[1].innerHTML = i18n.t('wechatStep2');
+                
+                const wechatSupport = document.querySelector('.wechat-tip-content > div:last-child');
+                if (wechatSupport) wechatSupport.textContent = i18n.t('wechatSupport');
             }
             
             toggleSettings() {
@@ -931,7 +1119,7 @@
                 }
 
                 this.recognition = new SpeechRecognition();
-                this.recognition.lang = 'zh-CN';
+                this.recognition.lang = i18n.getSpeechLang(); // 使用当前语言
                 this.recognition.continuous = true;
                 this.recognition.interimResults = true;
 
@@ -963,7 +1151,7 @@
                     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                         this.recognitionText.textContent = '❌ 麦克风权限被拒绝';
                         this.stopVoiceControl();
-                        alert('请允许麦克风权限以使用语音控制功能');
+                        alert(i18n.t('alertMicPermission'));
                         return;
                     }
                     
@@ -1012,7 +1200,7 @@
 
             toggleVoiceControl() {
                 if (this.segments.length === 0) {
-                    alert('请先录制听写内容');
+                    alert(i18n.t('alertNeedRecording'));
                     return;
                 }
 
@@ -1057,10 +1245,10 @@
                     
                     this.recognition.start();
                     this.isVoiceControlActive = true;
-                    this.voiceControlBtn.textContent = '暂停听写';
+                    this.voiceControlBtn.textContent = i18n.t('pauseDictation');
                     this.voiceIndicator.classList.remove('inactive');
-                    this.voiceStatus.textContent = '正在监听...';
-                    this.recognitionText.textContent = '等待语音命令...';
+                    this.voiceStatus.textContent = i18n.t('voiceControlListening');
+                    this.recognitionText.textContent = i18n.t('voiceControlWaiting');
                     this.recognitionText.classList.add('empty');
                     this.recognitionText.classList.add('show'); // 显示识别文字区域
                     
@@ -1087,7 +1275,7 @@
                             alert('无法启动语音识别：' + e2.message);
                         }
                     } else if (e.message && e.message.includes('not-allowed')) {
-                        alert('请允许麦克风权限以使用语音控制功能');
+                        alert(i18n.t('alertMicPermission'));
                     } else {
                         alert('无法启动语音识别：' + e.message);
                     }
@@ -1105,10 +1293,10 @@
                 this.isVoiceControlActive = false;
                 this.recognitionRestartCount = 0; // 重置计数器
                 this.isPausedForPlayback = false; // 重置播放暂停标志
-                this.voiceControlBtn.textContent = '开始听写';
+                this.voiceControlBtn.textContent = i18n.t('startDictation');
                 this.voiceIndicator.classList.add('inactive');
-                this.voiceStatus.textContent = '语音控制已关闭';
-                this.recognitionText.textContent = '等待语音命令...';
+                this.voiceStatus.textContent = i18n.t('voiceControlOff');
+                this.recognitionText.textContent = i18n.t('voiceControlWaiting');
                 this.recognitionText.classList.add('empty');
                 this.recognitionText.classList.remove('show'); // 隐藏识别文字区域
                 
@@ -1118,12 +1306,11 @@
             handleVoiceCommand(command) {
                 console.log('语音命令:', command);
                 
-                // 播放下一个的命令
-                const nextCommands = ['好', '好了', '好啦', '好咯', 'ok', '下一个',  '下一条','下一题', '好的', '写好了', '继续', '下一句', '对了', '完成', '知道了'];
-                // 重播的命令（包含"开始"，用于开始听写）
-                const replayCommands = ['什么', '啥', '开始', '重播', '再说一遍', '再来一次',  '没听清', '再听', '听不清', '重复', '重来'];
-                // 上一个的命令
-                const prevCommands = ['上一个', '上一题', '回退', '返回', '上一句', '前一个'];
+                // 获取当前语言的语音命令配置
+                const commands = i18n.getVoiceCommands();
+                const nextCommands = commands.next;
+                const replayCommands = commands.replay;
+                const prevCommands = commands.previous;
                 
                 const lowerCommand = command.toLowerCase();
                 
@@ -1210,7 +1397,7 @@
                     
                     this.startBtn.disabled = true;
                     this.stopBtn.disabled = false;
-                    this.updateStatus('🔴 正在录音...', 'recording');
+                    this.updateStatus(`🔴 ${i18n.t('statusRecording')}`, 'recording');
                     
                     // 显示可视化容器并开始绘制波形
                     this.visualizerContainer.classList.add('active');
@@ -1221,7 +1408,7 @@
                     
                 } catch (error) {
                     console.error('录音失败:', error);
-                    alert('无法访问麦克风,请检查权限设置');
+                    alert(i18n.t('alertMicPermission'));
                 }
             }
 
@@ -1242,7 +1429,7 @@
                     
                     this.startBtn.disabled = false;
                     this.stopBtn.disabled = true;
-                    this.updateStatus('⏳ 正在处理录音...', 'processing');
+                    this.updateStatus(`⏳ ${i18n.t('statusProcessing')}`, 'processing');
                 }
             }
 
@@ -1397,7 +1584,7 @@
                 
                 if (this.segments.length > 0) {
                     this.displaySegments();
-                    this.updateStatus(`✅ 录音完成,已分割为 ${this.segments.length} 个片段`, 'ready');
+                    this.updateStatus(`✅ ${i18n.t('statusComplete', { count: this.segments.length })}`, 'ready');
                     // 显示语音控制区域
                     this.voiceControl.classList.add('active');
                     // 重置播放位置到开头（需求1）
@@ -1408,7 +1595,7 @@
                     // 保存到 localStorage
                     await this.saveToLocalStorage(audioBlob);
                 } else {
-                    this.updateStatus('⚠️ 未检测到有效语音片段', 'idle');
+                    this.updateStatus(`⚠️ ${i18n.t('statusNoSegments')}`, 'idle');
                     // 禁用语音控制按钮
                     this.updateVoiceControlButton();
                 }
@@ -1467,7 +1654,7 @@
                             } catch (error) {
                                 console.error('保存到 localStorage 失败:', error);
                                 if (error.name === 'QuotaExceededError') {
-                                    alert('存储空间不足，无法保存录音数据');
+                                    alert(i18n.t('alertStorageFull'));
                                 }
                                 reject(error);
                             }
@@ -1528,9 +1715,15 @@
                         
                         // 更新状态信息
                         const playedCount = data.playedSegments ? data.playedSegments.length : 0;
-                        let statusMsg = `✅ 已恢复 ${this.segments.length} 个片段`;
+                        let statusMsg;
                         if (playedCount > 0) {
-                            statusMsg += `（已完成 ${playedCount}/${this.segments.length}）`;
+                            statusMsg = `✅ ${i18n.t('statusRestoredWithProgress', { 
+                                count: this.segments.length, 
+                                played: playedCount, 
+                                total: this.segments.length 
+                            })}`;
+                        } else {
+                            statusMsg = `✅ ${i18n.t('statusRestored', { count: this.segments.length })}`;
                         }
                         this.updateStatus(statusMsg, 'ready');
                         
@@ -1675,7 +1868,7 @@
                         <div class="waveform">
                             <div class="waveform-fill" id="waveform-${index}"></div>
                         </div>
-                        <button class="play-btn" data-index="${index}">播放</button>
+                        <button class="play-btn" data-index="${index}">${i18n.t('playButton')}</button>
                     `;
                     
                     const playBtn = item.querySelector('.play-btn');
