@@ -841,7 +841,7 @@
                 
                 this.silenceThresholdInput.addEventListener('input', (e) => {
                     this.silenceThreshold = parseFloat(e.target.value);
-                    this.silenceValue.textContent = this.silenceThreshold.toFixed(1) + ' 秒';
+                    this.silenceValue.textContent = this.silenceThreshold.toFixed(1) + `${i18n.t('secondUnit')}`;
                     this.saveSettings();
                 });
 
@@ -1104,7 +1104,7 @@
                         if (settings.silenceThreshold !== undefined) {
                             this.silenceThreshold = settings.silenceThreshold;
                             this.silenceThresholdInput.value = settings.silenceThreshold;
-                            this.silenceValue.textContent = settings.silenceThreshold.toFixed(1) + ' 秒';
+                            this.silenceValue.textContent = settings.silenceThreshold.toFixed(1) + `${i18n.t('secondUnit')}`;
                         }
                         
                         if (settings.volumeThreshold !== undefined) {
