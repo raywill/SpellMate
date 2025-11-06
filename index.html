@@ -30,7 +30,7 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- i18n 多语言支持 -->
-    <script src="i18n.js?v=202511061200"></script>
+    <script src="i18n.js?v=202511052300"></script>
     
     <style>
         * {
@@ -193,7 +193,6 @@
         .segment-item {
             position: relative;
             overflow: hidden;
-            border-radius: 8px;
             margin-bottom: 12px;
             background: #f9fafb;
         }
@@ -207,7 +206,8 @@
             transition: transform 0.3s ease;
             position: relative;
             z-index: 2;
-            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .segment-content:hover {
@@ -231,6 +231,7 @@
 
         .action-btn {
             width: 70px;
+            height: 100%;
             border: none;
             color: white;
             font-size: 13px;
@@ -241,6 +242,7 @@
             align-items: center;
             justify-content: center;
             padding: 0;
+            border-radius: 0;
         }
 
         .action-btn:hover {
@@ -273,7 +275,7 @@
         }
 
         @media (max-width: 768px) {
-            .segment-item {
+            .segment-content {
                 gap: 10px;
                 padding: 12px;
             }
@@ -833,7 +835,27 @@
             font-size: 60px;
             color: #ef4444;
         }
+
+        /* 版本信息 */
+        .version-info {
+            text-align: center;
+            padding: 20px;
+            color: #9ca3af;
+            font-size: 12px;
+            margin-top: 40px;
+        }
     </style>
+
+    <!-- 百度统计 -->
+    <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?936ee3aeeb6605fb7661ab5591425eba";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+    </script>
 </head>
 <body>
     <!-- 微信浏览器提示 -->
@@ -940,6 +962,11 @@
 
         <div class="empty-state" id="emptyState">
             点击"开始录制"按钮开始录音<br> 每词间隔一秒
+        </div>
+
+        <!-- 版本信息 -->
+        <div class="version-info">
+            v0.1@raywill
         </div>
     </div>
 
@@ -1907,7 +1934,7 @@
                 try {
                     // 重置重启计数器
                     this.recognitionRestartCount = 0;
-                    
+
                     this.recognition.start();
                     this.isVoiceControlActive = true;
                     this.voiceControlBtn.textContent = i18n.t('pauseDictation');
@@ -2313,7 +2340,6 @@
 
             playCompletionSound() {
                 // 生成一个简单的提示音（440Hz 正弦波）
-                // 获取或创建 audioContext
                 let audioContext = this.recorder.getAudioContext();
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -2606,6 +2632,11 @@
 
                     const playBtn = item.querySelector('.play-btn');
                     playBtn.addEventListener('click', () => {
+                        // 关键修复：在用户点击的同步调用栈中创建 AudioContext（iOS 要求）
+                        if (!this.recorder.audioContext) {
+                            this.recorder.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        }
+
                         this.lastManualClickIndex = index;
                         this.playSegmentTwice(index, playBtn);
                     });
@@ -2894,7 +2925,7 @@
                     // 获取或创建 audioContext
                     let audioContext = this.recorder.getAudioContext();
                     if (!audioContext) {
-                        // 如果 recorder 的 audioContext 不存在，创建一个新的
+                        alert('警告：AudioContext 未在用户手势中创建！iOS 静音模式可能无声音。');
                         audioContext = new (window.AudioContext || window.webkitAudioContext)();
                         this.recorder.audioContext = audioContext;
                     }
