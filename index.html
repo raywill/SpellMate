@@ -352,6 +352,25 @@
             text-align: right;
         }
 
+        .autoplay-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .autoplay-label-fast,
+        .autoplay-label-slow {
+            color: #9ca3af;
+            font-size: 13px;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .autoplay-item input[type="range"] {
+            flex: 1;
+            min-width: 150px;
+        }
+
         .language-selector {
             display: flex;
             gap: 8px;
@@ -708,14 +727,26 @@
             </div>
             <div class="settings-content" id="settingsContent">
                 <div class="setting-item">
-                    <label>停顿阈值 (秒):</label>
-                    <input type="range" id="silenceThreshold" min="0.5" max="3" step="0.1" value="1.0">
-                    <span class="value" id="silenceValue">1.0 秒</span>
+                    <label>停顿阈值:</label>
+                    <input type="range" id="silenceThreshold" min="0.2" max="3" step="0.1" value="0.3">
+                    <span class="value" id="silenceValue">1.0</span>
                 </div>
                 <div class="setting-item">
                     <label>音量阈值:</label>
                     <input type="range" id="volumeThreshold" min="0.001" max="0.05" step="0.001" value="0.01">
                     <span class="value" id="volumeValue">0.010</span>
+                </div>
+                <div class="setting-item">
+                    <label>重复播报:</label>
+                    <input type="range" id="repeatCount" min="1" max="6" step="1" value="1">
+                    <span class="value" id="repeatValue">1 次</span>
+                </div>
+                <div class="setting-item autoplay-item">
+                    <label>自动播放:</label>
+                    <span class="autoplay-label-fast">快</span>
+                    <input type="range" id="autoPlayInterval" min="0" max="100" step="1" value="100">
+                    <span class="autoplay-label-slow">慢</span>
+                    <span class="value" id="autoPlayValue">禁用</span>
                 </div>
                 <div class="setting-item" style="display: block;">
                     <label style="display: block; margin-bottom: 10px;" data-i18n="settingLanguage">语言:</label>
@@ -773,7 +804,7 @@
                 this.audioChunks = [];
                 this.isRecording = false;
                 this.segments = [];
-                this.silenceThreshold = 1.0; // 秒
+                this.silenceThreshold = 0.3; // 秒
                 this.volumeThreshold = 0.01; // 音量阈值
                 this.currentlyPlaying = null;
                 this.animationId = null;
@@ -788,6 +819,11 @@
                 this.recognitionRestartCount = 0; // 重启计数器
                 this.maxRestartAttempts = 3; // 最大重启次数
                 this.currentPlaybackId = 0; // 当前播放任务的唯一ID，用于取消旧的播放任务
+
+                // 自动播放相关
+                this.autoPlayInterval = 100; // 自动播放间隔，100表示禁用
+                this.autoPlayTimer = null; // 自动播放定时器
+                this.repeatCount = 1; // 重复播报次数，默认1次
 
                 this.initElements();
                 this.initLanguageSelector(); // 初始化语言选择器
@@ -812,6 +848,10 @@
                 this.silenceValue = document.getElementById('silenceValue');
                 this.volumeThresholdInput = document.getElementById('volumeThreshold');
                 this.volumeValue = document.getElementById('volumeValue');
+                this.repeatCountInput = document.getElementById('repeatCount');
+                this.repeatValue = document.getElementById('repeatValue');
+                this.autoPlayIntervalInput = document.getElementById('autoPlayInterval');
+                this.autoPlayValue = document.getElementById('autoPlayValue');
                 this.visualizerContainer = document.getElementById('visualizerContainer');
                 this.canvas = document.getElementById('audioVisualizer');
                 this.canvasCtx = this.canvas.getContext('2d');
@@ -849,6 +889,18 @@
                 this.volumeThresholdInput.addEventListener('input', (e) => {
                     this.volumeThreshold = parseFloat(e.target.value);
                     this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
+                    this.saveSettings();
+                });
+
+                this.repeatCountInput.addEventListener('input', (e) => {
+                    this.repeatCount = parseInt(e.target.value);
+                    this.repeatValue.textContent = this.repeatCount + ` ${i18n.t('timesUnit')}`;
+                    this.saveSettings();
+                });
+
+                this.autoPlayIntervalInput.addEventListener('input', (e) => {
+                    this.autoPlayInterval = parseInt(e.target.value);
+                    this.updateAutoPlayValue();
                     this.saveSettings();
                 });
 
@@ -1034,7 +1086,21 @@
                 const settingLabels = document.querySelectorAll('.setting-item label');
                 if (settingLabels[0]) settingLabels[0].textContent = i18n.t('settingSilence');
                 if (settingLabels[1]) settingLabels[1].textContent = i18n.t('settingVolume');
-                
+                if (settingLabels[2]) settingLabels[2].textContent = i18n.t('settingRepeatCount');
+                if (settingLabels[3]) settingLabels[3].textContent = i18n.t('settingAutoPlay');
+
+                // 自动播放快慢标签
+                const autoplayFast = document.querySelector('.autoplay-label-fast');
+                const autoplaySlow = document.querySelector('.autoplay-label-slow');
+                if (autoplayFast) autoplayFast.textContent = i18n.t('autoPlayFast');
+                if (autoplaySlow) autoplaySlow.textContent = i18n.t('autoPlaySlow');
+
+                // 更新重复播报显示值
+                this.repeatValue.textContent = this.repeatCount + ` ${i18n.t('timesUnit')}`;
+
+                // 更新自动播放显示值
+                this.updateAutoPlayValue();
+
                 document.querySelector('[data-i18n="settingLanguage"]').textContent = i18n.t('settingLanguage');
                 
                 // 片段标题
@@ -1072,7 +1138,7 @@
             
             toggleSettings() {
                 const isExpanded = this.settingsContent.classList.contains('expanded');
-                
+
                 if (isExpanded) {
                     this.settingsContent.classList.remove('expanded');
                     this.settingsToggle.classList.remove('expanded');
@@ -1082,12 +1148,23 @@
                 }
             }
 
+            updateAutoPlayValue() {
+                // 更新自动播放显示值：100=禁用，0-99=启用
+                if (this.autoPlayInterval >= 100) {
+                    this.autoPlayValue.textContent = i18n.t('autoPlayDisabled');
+                } else {
+                    this.autoPlayValue.textContent = i18n.t('autoPlayEnabled');
+                }
+            }
+
             saveSettings() {
                 // 保存设置到单独的 localStorage 项（需求3）
                 try {
                     const settings = {
                         silenceThreshold: this.silenceThreshold,
-                        volumeThreshold: this.volumeThreshold
+                        volumeThreshold: this.volumeThreshold,
+                        repeatCount: this.repeatCount,
+                        autoPlayInterval: this.autoPlayInterval
                     };
                     localStorage.setItem('voiceRecorderSettings', JSON.stringify(settings));
                 } catch (error) {
@@ -1101,19 +1178,31 @@
                     const savedSettings = localStorage.getItem('voiceRecorderSettings');
                     if (savedSettings) {
                         const settings = JSON.parse(savedSettings);
-                        
+
                         if (settings.silenceThreshold !== undefined) {
                             this.silenceThreshold = settings.silenceThreshold;
                             this.silenceThresholdInput.value = settings.silenceThreshold;
                             this.silenceValue.textContent = settings.silenceThreshold.toFixed(1) + `${i18n.t('secondUnit')}`;
                         }
-                        
+
                         if (settings.volumeThreshold !== undefined) {
                             this.volumeThreshold = settings.volumeThreshold;
                             this.volumeThresholdInput.value = settings.volumeThreshold;
                             this.volumeValue.textContent = settings.volumeThreshold.toFixed(3);
                         }
-                        
+
+                        if (settings.repeatCount !== undefined) {
+                            this.repeatCount = settings.repeatCount;
+                            this.repeatCountInput.value = settings.repeatCount;
+                            this.repeatValue.textContent = settings.repeatCount + ` ${i18n.t('timesUnit')}`;
+                        }
+
+                        if (settings.autoPlayInterval !== undefined) {
+                            this.autoPlayInterval = settings.autoPlayInterval;
+                            this.autoPlayIntervalInput.value = settings.autoPlayInterval;
+                            this.updateAutoPlayValue();
+                        }
+
                         console.log('设置已恢复:', settings);
                     }
                 } catch (error) {
@@ -1236,6 +1325,37 @@
                 }
             }
 
+            scheduleAutoPlay(currentIndex) {
+                // 清除之前的定时器
+                if (this.autoPlayTimer) {
+                    clearTimeout(this.autoPlayTimer);
+                    this.autoPlayTimer = null;
+                }
+
+                // 如果自动播放被禁用（值为100），不调度
+                if (this.autoPlayInterval >= 100) {
+                    return;
+                }
+
+                // 如果没有下一个片段，不调度
+                const nextIndex = currentIndex + 1;
+                if (nextIndex >= this.segments.length) {
+                    return;
+                }
+
+                // 计算等待时间：播放间隔 + 当前片段时长 × repeatCount
+                const currentSegment = this.segments[currentIndex];
+                const waitTime = this.autoPlayInterval === 0 ?
+                    1 : this.autoPlayInterval + currentSegment.duration * this.repeatCount;
+
+                console.log(`自动播放: 等待 ${waitTime.toFixed(1)} 秒后播放片段 ${nextIndex + 1}`);
+
+                // 调度下一个片段的播放
+                this.autoPlayTimer = setTimeout(() => {
+                    this.playNext();
+                }, waitTime * 1000);
+            }
+
             scrollToSegments() {
                 const segmentsContainer = document.getElementById('segmentsContainer');
                 if (segmentsContainer && segmentsContainer.style.display !== 'none') {
@@ -1270,7 +1390,15 @@
                             this.scrollToSegment(0);
                         }
                     }, 300);
-                    
+
+                    // 如果自动播放启用（值小于100），立即开始播放第一个片段
+                    if (this.autoPlayInterval < 100 && this.segments.length > 0) {
+                        console.log('自动播放已启用，立即播放第一个片段');
+                        setTimeout(() => {
+                            this.playNext();
+                        }, 500);
+                    }
+
                     console.log('语音控制已启动');
                 } catch (e) {
                     console.error('启动语音识别失败:', e);
@@ -1302,6 +1430,14 @@
                         console.log('停止语音识别时出错:', e);
                     }
                 }
+
+                // 清除自动播放定时器
+                if (this.autoPlayTimer) {
+                    clearTimeout(this.autoPlayTimer);
+                    this.autoPlayTimer = null;
+                    console.log('自动播放定时器已清除');
+                }
+
                 this.isVoiceControlActive = false;
                 this.isPausedForPlayback = false; // 重置暂停标志
                 this.recognitionRestartCount = 0; // 重置计数器
@@ -1949,6 +2085,12 @@
             }
 
             async playSegmentTwice(index, button) {
+                // 清除自动播放定时器（任何手动或语音触发的播放都会清除等待中的自动播放）
+                if (this.autoPlayTimer) {
+                    clearTimeout(this.autoPlayTimer);
+                    this.autoPlayTimer = null;
+                }
+
                 // 生成新的播放任务ID，用于取消之前的播放任务
                 const playbackId = ++this.currentPlaybackId;
 
@@ -1982,20 +2124,20 @@
                 this.lastManualClickIndex = index;
                 this.updateCurrentPlayingUI(index);
 
-                // 第一次播放
-                await this.playSegmentOnce(index, button, playbackId);
-                // 检查播放任务是否被取消
-                if (playbackId !== this.currentPlaybackId) return;
+                // 根据 repeatCount 播放 N 次
+                for (let i = 0; i < this.repeatCount; i++) {
+                    // 播放片段
+                    await this.playSegmentOnce(index, button, playbackId);
+                    // 检查播放任务是否被取消
+                    if (playbackId !== this.currentPlaybackId) return;
 
-                // 等待0.5秒
-                await new Promise(resolve => setTimeout(resolve, 500));
-                // 检查播放任务是否被取消
-                if (playbackId !== this.currentPlaybackId) return;
-
-                // 第二次播放
-                await this.playSegmentOnce(index, button, playbackId);
-                // 检查播放任务是否被取消
-                if (playbackId !== this.currentPlaybackId) return;
+                    // 如果不是最后一次播放，等待0.5秒
+                    if (i < this.repeatCount - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // 检查播放任务是否被取消
+                        if (playbackId !== this.currentPlaybackId) return;
+                    }
+                }
 
                 // 播放完成后清除状态
                 this.updateCurrentPlayingUI(-1);
@@ -2009,6 +2151,9 @@
                 if (shouldRestartRecognition) {
                     this.resumeRecognition();
                 }
+
+                // 调度自动播放下一个片段
+                this.scheduleAutoPlay(index);
 
                 // 保存播放进度到 localStorage
                 this.saveProgress();
