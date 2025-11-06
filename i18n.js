@@ -94,7 +94,16 @@ const i18n = {
             segmentsTitle: '录音片段',
             playButton: '播放',
             secondUnit: '秒',
-            
+            reRecord: '补录',
+            deleteSegment: '删除',
+            deleteConfirm: '确定要删除这个片段吗？',
+            addSegment: '添加片段',
+            statusReRecording: '正在补录第 {index} 个片段...',
+            statusReRecordComplete: '补录完成',
+            statusContinueRecording: '续录中...',
+            statusContinueComplete: '续录完成，新增 {count} 个片段，共 {total} 个',
+            errorProcessing: '处理录音时出错',
+
             emptyState: '点击"开始录制"按钮开始录音<br>每词间隔一秒',
             
             alertNeedRecording: '请先录制听写内容',
@@ -161,7 +170,16 @@ const i18n = {
             segmentsTitle: 'Audio Segments',
             playButton: 'Play',
             secondUnit: 's',
-            
+            reRecord: 'Re-record',
+            deleteSegment: 'Delete',
+            deleteConfirm: 'Are you sure you want to delete this segment?',
+            addSegment: 'Add Segment',
+            statusReRecording: 'Re-recording segment #{index}...',
+            statusReRecordComplete: 'Re-recording complete',
+            statusContinueRecording: 'Continue recording...',
+            statusContinueComplete: 'Added {count} new segments, total {total}',
+            errorProcessing: 'Error processing recording',
+
             emptyState: 'Click "Start Recording" to begin<br>Pause 1 second between words',
             
             alertNeedRecording: 'Please record content first',
@@ -228,7 +246,16 @@ const i18n = {
             segmentsTitle: '音声セグメント',
             playButton: '再生',
             secondUnit: '秒',
-            
+            reRecord: '再録音',
+            deleteSegment: '削除',
+            deleteConfirm: 'このセグメントを削除してもよろしいですか？',
+            addSegment: 'セグメント追加',
+            statusReRecording: 'セグメント #{index} を再録音中...',
+            statusReRecordComplete: '再録音完了',
+            statusContinueRecording: '続けて録音中...',
+            statusContinueComplete: '{count} 個の新しいセグメントを追加、合計 {total} 個',
+            errorProcessing: '録音処理エラー',
+
             emptyState: '「録音開始」をクリックして開始<br>単語間に1秒の間隔',
             
             alertNeedRecording: '先に内容を録音してください',
@@ -293,6 +320,15 @@ const i18n = {
             timesUnit: 'fois',
             
             segmentsTitle: 'Segments audio',
+            reRecord: "Re-record",
+            deleteSegment: "Delete",
+            deleteConfirm: "Delete this segment?",
+            addSegment: "Add Segment",
+            statusReRecording: "Re-recording #{index}...",
+            statusReRecordComplete: "Re-record complete",
+            statusContinueRecording: "Continue recording...",
+            statusContinueComplete: "Added {count} segments, total {total}",
+            errorProcessing: "Processing error",
             playButton: 'Lire',
             secondUnit: 's',
             
@@ -360,6 +396,15 @@ const i18n = {
             timesUnit: 'mal',
             
             segmentsTitle: 'Audio-Segmente',
+            reRecord: "Nachaufnahme",
+            deleteSegment: "Löschen",
+            deleteConfirm: "Segment löschen?",
+            addSegment: "Segment hinzufügen",
+            statusReRecording: "Nachaufnahme #{index}...",
+            statusReRecordComplete: "Nachaufnahme abgeschlossen",
+            statusContinueRecording: "Aufnahme fortsetzen...",
+            statusContinueComplete: "{count} Segmente hinzugefügt, insgesamt {total}",
+            errorProcessing: "Verarbeitungsfehler",
             playButton: 'Abspielen',
             secondUnit: 's',
             
@@ -427,6 +472,15 @@ const i18n = {
             timesUnit: 'veces',
             
             segmentsTitle: 'Segmentos de audio',
+            reRecord: "Regrabar",
+            deleteSegment: "Eliminar",
+            deleteConfirm: "¿Eliminar segmento?",
+            addSegment: "Añadir segmento",
+            statusReRecording: "Regrabando #{index}...",
+            statusReRecordComplete: "Regrabación completa",
+            statusContinueRecording: "Continuar grabación...",
+            statusContinueComplete: "{count} segmentos añadidos, total {total}",
+            errorProcessing: "Error de procesamiento",
             playButton: 'Reproducir',
             secondUnit: 's',
             
@@ -494,6 +548,15 @@ const i18n = {
             timesUnit: '회',
             
             segmentsTitle: '오디오 세그먼트',
+            reRecord: "재녹음",
+            deleteSegment: "삭제",
+            deleteConfirm: "세그먼트를 삭제하시겠습니까?",
+            addSegment: "세그먼트 추가",
+            statusReRecording: "#{index} 재녹음 중...",
+            statusReRecordComplete: "재녹음 완료",
+            statusContinueRecording: "녹음 계속...",
+            statusContinueComplete: "{count}개 세그먼트 추가, 총 {total}개",
+            errorProcessing: "처리 오류",
             playButton: '재생',
             secondUnit: '초',
             
@@ -561,6 +624,15 @@ const i18n = {
             timesUnit: 'раз',
             
             segmentsTitle: 'Аудио сегменты',
+            reRecord: "Перезаписать",
+            deleteSegment: "Удалить",
+            deleteConfirm: "Удалить сегмент?",
+            addSegment: "Добавить сегмент",
+            statusReRecording: "Перезапись #{index}...",
+            statusReRecordComplete: "Перезапись завершена",
+            statusContinueRecording: "Продолжение записи...",
+            statusContinueComplete: "Добавлено {count} сегментов, всего {total}",
+            errorProcessing: "Ошибка обработки",
             playButton: 'Играть',
             secondUnit: 'с',
             

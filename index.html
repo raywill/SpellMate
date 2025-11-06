@@ -191,18 +191,72 @@
         }
 
         .segment-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            background: #f9fafb;
+        }
+
+        .segment-content {
             display: flex;
             align-items: center;
             gap: 15px;
             padding: 15px;
             background: #f9fafb;
+            transition: transform 0.3s ease;
+            position: relative;
+            z-index: 2;
             border-radius: 8px;
-            transition: all 0.2s ease;
         }
 
-        .segment-item:hover {
+        .segment-content:hover {
             background: #f3f4f6;
-            transform: translateX(5px);
+        }
+
+        .segment-content.swiped {
+            transform: translateX(-140px);
+        }
+
+        .segment-actions {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 140px;
+            display: flex;
+            gap: 0;
+            z-index: 1;
+        }
+
+        .action-btn {
+            width: 70px;
+            border: none;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .action-btn:hover {
+            filter: brightness(0.9);
+        }
+
+        .action-btn:active {
+            filter: brightness(0.8);
+        }
+
+        .re-record-btn {
+            background: #10b981;
+        }
+
+        .delete-btn {
+            background: #ef4444;
         }
 
         .segment-number {
@@ -620,6 +674,37 @@
             color: #9ca3af;
         }
 
+        /* 添加片段按钮 */
+        .add-segment-btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .add-segment-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .add-segment-btn:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            .add-segment-btn {
+                width: 100%;
+                padding: 14px 20px;
+            }
+        }
+
         /* 微信浏览器提示 */
         .wechat-tip {
             display: none;
@@ -814,6 +899,9 @@
         <div class="segments" id="segmentsContainer" style="display: none;">
             <h2>📝 录音片段 (<span id="segmentCount">0</span>)</h2>
             <div class="segment-list" id="segmentList"></div>
+            <div class="add-segment-container" style="margin-top: 20px; text-align: center;">
+                <button id="addSegmentBtn" class="add-segment-btn">➕ <span data-i18n="addSegment">添加片段</span></button>
+            </div>
         </div>
 
         <div class="empty-state" id="emptyState">
@@ -844,6 +932,307 @@
             });
         }
 
+        // ==================== 组件类定义 ====================
+
+        /**
+         * AudioRecorder - 录音组件
+         * 职责：纯粹的录音功能
+         */
+        class AudioRecorder {
+            constructor() {
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.stream = null;
+                this.analyser = null;
+                this.audioContext = null;
+                this.dataArray = null;
+            }
+
+            async start() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                    // 设置音频可视化
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.analyser = this.audioContext.createAnalyser();
+                    const source = this.audioContext.createMediaStreamSource(this.stream);
+                    source.connect(this.analyser);
+
+                    this.analyser.fftSize = 2048;
+                    const bufferLength = this.analyser.frequencyBinCount;
+                    this.dataArray = new Uint8Array(bufferLength);
+
+                    this.audioChunks = [];
+                    this.mediaRecorder = new MediaRecorder(this.stream);
+
+                    return new Promise((resolve, reject) => {
+                        this.mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                this.audioChunks.push(event.data);
+                            }
+                        };
+
+                        this.mediaRecorder.onerror = (event) => {
+                            console.error('MediaRecorder错误:', event.error);
+                            reject(event.error);
+                        };
+
+                        this.mediaRecorder.onpause = () => {
+                            console.warn('录音被暂停');
+                        };
+
+                        this.mediaRecorder.onresume = () => {
+                            console.log('录音已恢复');
+                        };
+
+                        this.mediaRecorder.start();
+                        resolve();
+                    });
+                } catch (error) {
+                    console.error('启动录音失败:', error);
+                    throw error;
+                }
+            }
+
+            stop() {
+                return new Promise((resolve) => {
+                    if (!this.mediaRecorder) {
+                        resolve(null);
+                        return;
+                    }
+
+                    this.mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                        this.stream?.getTracks().forEach(track => track.stop());
+                        resolve(audioBlob);
+                    };
+
+                    this.mediaRecorder.stop();
+                });
+            }
+
+            getVisualizer() {
+                return {
+                    analyser: this.analyser,
+                    dataArray: this.dataArray
+                };
+            }
+
+            getAudioContext() {
+                return this.audioContext;
+            }
+        }
+
+        /**
+         * AudioSegmentProcessor - 音频处理器
+         * 职责：音频分割
+         */
+        class AudioSegmentProcessor {
+            constructor(audioContext) {
+                this.audioContext = audioContext;
+            }
+
+            async splitByPauses(audioBlob, config) {
+                const { silenceThreshold, volumeThreshold } = config;
+
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+                const channelData = audioBuffer.getChannelData(0);
+                const sampleRate = audioBuffer.sampleRate;
+                const silenceSamples = Math.floor(silenceThreshold * sampleRate);
+
+                // 计算每个样本的音量
+                const volumes = [];
+                const windowSize = Math.floor(sampleRate * 0.02); // 20ms window
+
+                for (let i = 0; i < channelData.length; i += windowSize) {
+                    let sum = 0;
+                    for (let j = 0; j < windowSize && i + j < channelData.length; j++) {
+                        sum += Math.abs(channelData[i + j]);
+                    }
+                    volumes.push(sum / windowSize);
+                }
+
+                // 查找停顿点
+                const segments = [];
+                let segmentStart = null;
+                let silenceStart = null;
+                let silenceCount = 0;
+
+                for (let i = 0; i < volumes.length; i++) {
+                    if (volumes[i] > volumeThreshold) {
+                        // 有声音
+                        if (segmentStart === null) {
+                            segmentStart = i * windowSize;
+                        }
+                        silenceStart = null;
+                        silenceCount = 0;
+                    } else {
+                        // 静音
+                        if (segmentStart !== null) {
+                            if (silenceStart === null) {
+                                silenceStart = i * windowSize;
+                            }
+                            silenceCount++;
+
+                            // 检查是否达到停顿阈值
+                            if (silenceCount * windowSize >= silenceSamples) {
+                                const segmentEnd = silenceStart;
+                                const segment = this.extractSegment(audioBuffer, segmentStart, segmentEnd);
+                                if (segment) {
+                                    segments.push(segment);
+                                }
+                                segmentStart = null;
+                                silenceStart = null;
+                                silenceCount = 0;
+                            }
+                        }
+                    }
+                }
+
+                // 处理最后一个片段
+                if (segmentStart !== null) {
+                    const segmentEnd = channelData.length;
+                    const segment = this.extractSegment(audioBuffer, segmentStart, segmentEnd);
+                    if (segment) {
+                        segments.push(segment);
+                    }
+                }
+
+                return segments;
+            }
+
+            extractSegment(audioBuffer, startSample, endSample) {
+                const sampleRate = audioBuffer.sampleRate;
+                const padding = Math.floor(sampleRate * 0.1); // 0.1秒的缓冲
+
+                // 向前后扩展，但不超出边界
+                const actualStart = Math.max(0, startSample - padding);
+                const actualEnd = Math.min(audioBuffer.length, endSample + padding);
+                const length = actualEnd - actualStart;
+
+                // 过滤太短的片段 (小于0.2秒，不包括缓冲)
+                const originalLength = endSample - startSample;
+                if (originalLength < sampleRate * 0.2) {
+                    return null;
+                }
+
+                const numberOfChannels = audioBuffer.numberOfChannels;
+                const segmentBuffer = this.audioContext.createBuffer(
+                    numberOfChannels,
+                    length,
+                    sampleRate
+                );
+
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const sourceData = audioBuffer.getChannelData(channel);
+                    const segmentData = segmentBuffer.getChannelData(channel);
+                    for (let i = 0; i < length; i++) {
+                        segmentData[i] = sourceData[actualStart + i];
+                    }
+                }
+
+                return segmentBuffer;
+            }
+        }
+
+        /**
+         * SegmentManager - 片段管理器
+         * 职责：片段的CRUD操作和存储
+         */
+        class SegmentManager {
+            constructor() {
+                this.segments = [];
+                this.storageKey = 'voiceRecorderData';
+            }
+
+            add(segments) {
+                this.segments.push(...segments);
+                return this.segments.length;
+            }
+
+            replace(index, newSegments) {
+                if (index < 0 || index >= this.segments.length) {
+                    console.error('Invalid segment index:', index);
+                    return false;
+                }
+                // 删除1个，插入N个
+                this.segments.splice(index, 1, ...newSegments);
+                return true;
+            }
+
+            delete(index) {
+                if (index < 0 || index >= this.segments.length) {
+                    console.error('Invalid segment index:', index);
+                    return false;
+                }
+                this.segments.splice(index, 1);
+                return true;
+            }
+
+            clear() {
+                this.segments = [];
+            }
+
+            getAll() {
+                return this.segments;
+            }
+
+            getCount() {
+                return this.segments.length;
+            }
+
+            get(index) {
+                return this.segments[index];
+            }
+
+            async save(additionalData = {}) {
+                try {
+                    // 注意：这里暂时保存 AudioBuffer 对象
+                    // 实际使用时会在 VoiceRecorder 中处理 Blob 转换
+                    const data = {
+                        segmentCount: this.segments.length,
+                        timestamp: Date.now(),
+                        version: 2,
+                        ...additionalData
+                    };
+                    localStorage.setItem(this.storageKey, JSON.stringify(data));
+                    return true;
+                } catch (error) {
+                    console.error('保存到 localStorage 失败:', error);
+                    if (error.name === 'QuotaExceededError') {
+                        throw new Error('STORAGE_FULL');
+                    }
+                    return false;
+                }
+            }
+
+            load() {
+                try {
+                    const savedData = localStorage.getItem(this.storageKey);
+                    if (!savedData) {
+                        return null;
+                    }
+                    return JSON.parse(savedData);
+                } catch (error) {
+                    console.error('从 localStorage 加载失败:', error);
+                    return null;
+                }
+            }
+
+            clearStorage() {
+                try {
+                    localStorage.removeItem(this.storageKey);
+                    console.log('localStorage 已清理');
+                } catch (error) {
+                    console.error('清理 localStorage 失败:', error);
+                }
+            }
+        }
+
+        // ==================== 主控制器 ====================
+
         class VoiceRecorder {
             constructor() {
                 // 如果在微信中，不初始化应用
@@ -852,32 +1241,43 @@
                     return;
                 }
 
-                this.mediaRecorder = null;
-                this.audioContext = null;
-                this.analyser = null;
-                this.audioChunks = [];
+                // 初始化组件
+                this.recorder = new AudioRecorder();
+                this.segmentMgr = new SegmentManager();
+                this.processor = null; // 将在录音后初始化，因为需要 AudioContext
+
+                // 录制状态
                 this.isRecording = false;
-                this.segments = [];
+                this.recordMode = 'new'; // 'new' | 'continue' | 'rerecord'
+                this.rerecordIndex = -1; // 补录时的片段索引
+
+                // 设置参数
                 this.silenceThreshold = 0.3; // 秒
                 this.volumeThreshold = 0.01; // 音量阈值
+                this.autoPlayInterval = 100; // 自动播放间隔，100表示禁用
+                this.autoPlayTimer = null; // 自动播放定时器
+                this.repeatCount = 1; // 重复播报次数，默认1次
+
+                // 播放控制
                 this.currentlyPlaying = null;
+                this.currentPlayingIndex = -1; // 当前播放的片段索引
+                this.lastManualClickIndex = -1; // 最后一次手动点击的索引
+                this.currentPlaybackId = 0; // 当前播放任务的唯一ID，用于取消旧的播放任务
+
+                // 波形可视化
                 this.animationId = null;
-                this.dataArray = null;
-                
+                this.canvas = null;
+                this.canvasCtx = null;
+
                 // 语音控制相关
                 this.recognition = null;
                 this.isVoiceControlActive = false;
                 this.isPausedForPlayback = false; // 标记是否因播放音频而暂停识别
-                this.currentPlayingIndex = -1; // 当前播放的片段索引
-                this.lastManualClickIndex = -1; // 最后一次手动点击的索引
                 this.recognitionRestartCount = 0; // 重启计数器
                 this.maxRestartAttempts = 3; // 最大重启次数
-                this.currentPlaybackId = 0; // 当前播放任务的唯一ID，用于取消旧的播放任务
 
-                // 自动播放相关
-                this.autoPlayInterval = 100; // 自动播放间隔，100表示禁用
-                this.autoPlayTimer = null; // 自动播放定时器
-                this.repeatCount = 1; // 重复播报次数，默认1次
+                // 滑动交互相关
+                this.swipeHandlers = []; // 存储每个片段的滑动处理器
 
                 this.initElements();
                 this.initLanguageSelector(); // 初始化语言选择器
@@ -888,6 +1288,11 @@
                 this.loadSettings(); // 加载设置
                 this.updateVoiceControlButton(); // 初始化按钮状态
                 this.loadFromLocalStorage();
+            }
+
+            // Getter: 兼容现有代码，让 this.segments 指向 segmentMgr
+            get segments() {
+                return this.segmentMgr.getAll();
             }
 
             initElements() {
@@ -921,6 +1326,9 @@
                 this.settingsHeader = document.getElementById('settingsHeader');
                 this.settingsContent = document.getElementById('settingsContent');
                 this.settingsToggle = document.getElementById('settingsToggle');
+
+                // 添加片段按钮
+                this.addSegmentBtn = document.getElementById('addSegmentBtn');
             }
 
             initCanvas() {
@@ -960,10 +1368,21 @@
 
                 // 语音控制按钮
                 this.voiceControlBtn.addEventListener('click', () => this.toggleVoiceControl());
-                
+
+                // 添加片段按钮（续录）
+                this.addSegmentBtn.addEventListener('click', () => {
+                    console.log('点击添加片段按钮');
+                    // 滚动到页面顶部（录制面板）
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    // 延迟一点开始录制，让用户看到滚动
+                    setTimeout(() => {
+                        this.startRecording('continue');
+                    }, 300);
+                });
+
                 // 设置面板展开/折叠
                 this.settingsHeader.addEventListener('click', () => this.toggleSettings());
-                
+
                 // 监听页面可见性变化，处理锁屏问题
                 document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
             }
@@ -972,25 +1391,25 @@
                 if (document.hidden) {
                     // 页面被隐藏（锁屏或切换标签页）
                     console.log('页面被隐藏');
-                    
+
                     // 如果正在录音，记录状态但继续录音
-                    if (this.isRecording && this.mediaRecorder) {
+                    if (this.isRecording && this.recorder.mediaRecorder) {
                         console.log('录音进行中，页面被隐藏');
                     }
                 } else {
                     // 页面恢复可见
                     console.log('页面恢复可见');
-                    
+
                     // 检查录音状态
-                    if (this.isRecording && this.mediaRecorder) {
-                        if (this.mediaRecorder.state === 'inactive') {
+                    if (this.isRecording && this.recorder.mediaRecorder) {
+                        if (this.recorder.mediaRecorder.state === 'inactive') {
                             // MediaRecorder已停止，需要提示用户
                             console.warn('录音已中断');
                             this.handleRecordingInterrupted();
-                        } else if (this.mediaRecorder.state === 'paused') {
+                        } else if (this.recorder.mediaRecorder.state === 'paused') {
                             // MediaRecorder被暂停，尝试恢复
                             try {
-                                this.mediaRecorder.resume();
+                                this.recorder.mediaRecorder.resume();
                                 console.log('恢复录音');
                             } catch (e) {
                                 console.error('恢复录音失败:', e);
@@ -1001,10 +1420,11 @@
                             console.log('录音状态正常');
                         }
                     }
-                    
+
                     // 如果AudioContext被挂起，恢复它
-                    if (this.audioContext && this.audioContext.state === 'suspended') {
-                        this.audioContext.resume().then(() => {
+                    const audioContext = this.recorder.getAudioContext();
+                    if (audioContext && audioContext.state === 'suspended') {
+                        audioContext.resume().then(() => {
                             console.log('AudioContext已恢复');
                         }).catch(e => {
                             console.error('恢复AudioContext失败:', e);
@@ -1163,7 +1583,13 @@
                 this.updateAutoPlayValue();
 
                 document.querySelector('[data-i18n="settingLanguage"]').textContent = i18n.t('settingLanguage');
-                
+
+                // 添加片段按钮
+                const addSegmentSpan = document.querySelector('[data-i18n="addSegment"]');
+                if (addSegmentSpan) {
+                    addSegmentSpan.textContent = i18n.t('addSegment');
+                }
+
                 // 片段标题
                 const segmentsTitle = document.querySelector('#segmentsContainer h2');
                 if (segmentsTitle) {
@@ -1177,7 +1603,15 @@
                         btn.textContent = i18n.t('playButton');
                     }
                 });
-                
+
+                // 补录和删除按钮
+                document.querySelectorAll('.re-record-btn').forEach(btn => {
+                    btn.textContent = i18n.t('reRecord');
+                });
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.textContent = i18n.t('deleteSegment');
+                });
+
                 // 空状态
                 if (this.emptyState) {
                     this.emptyState.innerHTML = i18n.t('emptyState');
@@ -1589,98 +2023,92 @@
                 this.status.className = `status ${className}`;
             }
 
-            async startRecording() {
+            async startRecording(mode = 'new', rerecordIndex = -1) {
                 try {
-                    // 清理 localStorage 和当前数据
-                    this.clearLocalStorage();
-                    this.segments = [];
-                    this.segmentList.innerHTML = '';
-                    this.segmentsContainer.style.display = 'none';
-                    this.emptyState.style.display = 'block';
-                    this.voiceControl.classList.remove('active');
-                    if (this.isVoiceControlActive) {
-                        this.stopVoiceControl();
-                    }
-                    
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    
-                    // 设置音频可视化
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    this.analyser = this.audioContext.createAnalyser();
-                    const source = this.audioContext.createMediaStreamSource(stream);
-                    source.connect(this.analyser);
-                    
-                    this.analyser.fftSize = 2048;
-                    const bufferLength = this.analyser.frequencyBinCount;
-                    this.dataArray = new Uint8Array(bufferLength);
-                    
-                    this.audioChunks = [];
-                    this.mediaRecorder = new MediaRecorder(stream);
-                    
-                    this.mediaRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) {
-                            this.audioChunks.push(event.data);
+                    this.recordMode = mode;
+                    this.rerecordIndex = rerecordIndex;
+
+                    // 根据模式决定是否清空数据
+                    if (mode === 'new') {
+                        // 全新录制：清空所有
+                        this.segmentMgr.clearStorage();
+                        this.segmentMgr.clear();
+                        this.segmentList.innerHTML = '';
+                        this.segmentsContainer.style.display = 'none';
+                        this.emptyState.style.display = 'block';
+                        this.voiceControl.classList.remove('active');
+                        if (this.isVoiceControlActive) {
+                            this.stopVoiceControl();
                         }
-                    };
+                        console.log('全新录制模式');
+                    } else if (mode === 'continue') {
+                        // 续录：保留现有片段
+                        console.log('续录模式，当前片段数:', this.segmentMgr.getCount());
+                    } else if (mode === 'rerecord') {
+                        // 补录：记录要替换的索引
+                        console.log('补录模式，替换索引:', rerecordIndex);
+                    }
 
-                    this.mediaRecorder.onstop = () => {
-                        this.processRecording();
-                    };
-
-                    // 监听录音错误
-                    this.mediaRecorder.onerror = (event) => {
-                        console.error('MediaRecorder错误:', event.error);
-                        this.handleRecordingInterrupted();
-                    };
-
-                    // 监听录音暂停（某些浏览器在锁屏时会暂停）
-                    this.mediaRecorder.onpause = () => {
-                        console.warn('录音被暂停');
-                    };
-
-                    // 监听录音恢复
-                    this.mediaRecorder.onresume = () => {
-                        console.log('录音已恢复');
-                    };
-
-                    this.mediaRecorder.start();
+                    // 使用 AudioRecorder 组件开始录音
+                    await this.recorder.start();
                     this.isRecording = true;
-                    
+
+                    // 获取可视化器
+                    const { analyser, dataArray } = this.recorder.getVisualizer();
+                    this.analyser = analyser;
+                    this.dataArray = dataArray;
+
+                    // 更新UI
                     this.startBtn.disabled = true;
                     this.stopBtn.disabled = false;
-                    this.updateStatus(`🔴 ${i18n.t('statusRecording')}`, 'recording');
-                    
+
+                    let statusText = i18n.t('statusRecording');
+                    if (mode === 'rerecord') {
+                        statusText = i18n.t('statusReRecording', { index: rerecordIndex + 1 });
+                    } else if (mode === 'continue') {
+                        statusText = i18n.t('statusContinueRecording');
+                    }
+                    this.updateStatus(`🔴 ${statusText}`, 'recording');
+
                     // 显示可视化容器并开始绘制波形
                     this.visualizerContainer.classList.add('active');
                     this.drawWaveform();
-                    
-                    // 更新语音控制按钮状态（禁用，因为还没有片段）
+
+                    // 更新语音控制按钮状态
                     this.updateVoiceControlButton();
-                    
+
                 } catch (error) {
                     console.error('录音失败:', error);
                     alert(i18n.t('alertMicPermission'));
                 }
             }
 
-            stopRecording() {
-                if (this.mediaRecorder && this.isRecording) {
-                    this.mediaRecorder.stop();
-                    this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            async stopRecording() {
+                if (!this.isRecording) return;
+
+                try {
+                    // 使用 AudioRecorder 组件停止录音
+                    const audioBlob = await this.recorder.stop();
                     this.isRecording = false;
-                    
+
                     // 停止波形动画
                     if (this.animationId) {
                         cancelAnimationFrame(this.animationId);
                         this.animationId = null;
                     }
-                    
+
                     // 隐藏可视化容器
                     this.visualizerContainer.classList.remove('active');
-                    
+
                     this.startBtn.disabled = false;
                     this.stopBtn.disabled = true;
                     this.updateStatus(`⏳ ${i18n.t('statusProcessing')}`, 'processing');
+
+                    // 处理录音
+                    await this.processRecording(audioBlob);
+
+                } catch (error) {
+                    console.error('停止录音失败:', error);
                 }
             }
 
@@ -1801,48 +2229,98 @@
 
             playCompletionSound() {
                 // 生成一个简单的提示音（440Hz 正弦波）
-                const audioContext = this.audioContext;
+                // 获取或创建 audioContext
+                let audioContext = this.recorder.getAudioContext();
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.recorder.audioContext = audioContext;
+                }
+
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
-                
+
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
-                
+
                 oscillator.frequency.value = 440; // A4音
                 oscillator.type = 'sine';
-                
+
                 gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
+
                 oscillator.start(audioContext.currentTime);
                 oscillator.stop(audioContext.currentTime + 0.3);
             }
 
-            async processRecording() {
-                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-                const arrayBuffer = await audioBlob.arrayBuffer();
-                
-                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-                
-                this.segments = this.splitAudioByPauses(audioBuffer);
-                
-                if (this.segments.length > 0) {
+            async processRecording(audioBlob) {
+                try {
+                    // 初始化音频处理器（使用录音器的 AudioContext）
+                    const audioContext = this.recorder.getAudioContext();
+                    if (!this.processor) {
+                        this.processor = new AudioSegmentProcessor(audioContext);
+                    }
+
+                    // 使用 AudioSegmentProcessor 分割音频
+                    const newSegments = await this.processor.splitByPauses(audioBlob, {
+                        silenceThreshold: this.silenceThreshold,
+                        volumeThreshold: this.volumeThreshold
+                    });
+
+                    if (newSegments.length === 0) {
+                        this.updateStatus(`⚠️ ${i18n.t('statusNoSegments')}`, 'idle');
+                        this.updateVoiceControlButton();
+                        return;
+                    }
+
+                    // 根据录制模式处理片段
+                    if (this.recordMode === 'new') {
+                        // 全新录制：清空后添加
+                        this.segmentMgr.clear();
+                        this.segmentMgr.add(newSegments);
+                        this.currentPlayingIndex = -1;
+                        this.lastManualClickIndex = -1;
+                    } else if (this.recordMode === 'continue') {
+                        // 续录：追加到末尾
+                        this.segmentMgr.add(newSegments);
+                    } else if (this.recordMode === 'rerecord') {
+                        // 补录：替换指定片段
+                        this.segmentMgr.replace(this.rerecordIndex, newSegments);
+                        // 更新播放索引
+                        if (this.currentPlayingIndex === this.rerecordIndex) {
+                            this.currentPlayingIndex = -1;
+                        }
+                        if (this.lastManualClickIndex === this.rerecordIndex) {
+                            this.lastManualClickIndex = -1;
+                        }
+                    }
+
+                    // 显示片段
                     this.displaySegments();
-                    this.updateStatus(`✅ ${i18n.t('statusComplete', { count: this.segments.length })}`, 'ready');
+
+                    // 更新状态
+                    const totalCount = this.segmentMgr.getCount();
+                    let statusMsg;
+                    if (this.recordMode === 'rerecord') {
+                        statusMsg = `✅ ${i18n.t('statusReRecordComplete')}`;
+                    } else if (this.recordMode === 'continue') {
+                        statusMsg = `✅ ${i18n.t('statusContinueComplete', { count: newSegments.length, total: totalCount })}`;
+                    } else {
+                        statusMsg = `✅ ${i18n.t('statusComplete', { count: totalCount })}`;
+                    }
+                    this.updateStatus(statusMsg, 'ready');
+
                     // 显示语音控制区域
                     this.voiceControl.classList.add('active');
-                    // 重置播放位置到开头（需求1）
-                    this.currentPlayingIndex = -1;
-                    this.lastManualClickIndex = -1;
+
                     // 启用语音控制按钮
                     this.updateVoiceControlButton();
+
                     // 保存到 localStorage
                     await this.saveToLocalStorage(audioBlob);
-                } else {
-                    this.updateStatus(`⚠️ ${i18n.t('statusNoSegments')}`, 'idle');
-                    // 禁用语音控制按钮
-                    this.updateVoiceControlButton();
+
+                } catch (error) {
+                    console.error('处理录音失败:', error);
+                    this.updateStatus(`⚠️ ${i18n.t('errorProcessing')}`, 'idle');
                 }
             }
 
@@ -1874,25 +2352,34 @@
                 }
             }
 
-            async saveToLocalStorage(audioBlob) {
+            async saveToLocalStorage(audioBlob = null) {
                 try {
+                    // 如果没有提供 audioBlob，只更新播放进度
+                    if (!audioBlob) {
+                        this.saveProgress();
+                        return;
+                    }
+
                     // 将 Blob 转为 base64
                     const reader = new FileReader();
                     reader.readAsDataURL(audioBlob);
-                    
+
                     return new Promise((resolve, reject) => {
                         reader.onload = () => {
                             try {
                                 const data = {
                                     audioData: reader.result,
                                     timestamp: Date.now(),
-                                    segmentCount: this.segments.length,
+                                    segmentCount: this.segmentMgr.getCount(),
                                     silenceThreshold: this.silenceThreshold,
                                     volumeThreshold: this.volumeThreshold,
                                     currentPlayingIndex: this.currentPlayingIndex,
                                     lastManualClickIndex: this.lastManualClickIndex,
-                                    playedSegments: this.getPlayedSegments() // 获取已播放的片段列表
+                                    playedSegments: this.getPlayedSegments(),
+                                    version: 2 // 标记数据版本
                                 };
+
+                                // 使用 SegmentManager 保存
                                 localStorage.setItem('voiceRecorderData', JSON.stringify(data));
                                 console.log('数据已保存到 localStorage');
                                 resolve();
@@ -1922,24 +2409,35 @@
                     const data = JSON.parse(savedData);
                     console.log('从 localStorage 加载数据...', {
                         timestamp: new Date(data.timestamp),
-                        segmentCount: data.segmentCount
+                        segmentCount: data.segmentCount,
+                        version: data.version
                     });
 
                     // 将 base64 转回 Blob
                     const response = await fetch(data.audioData);
                     const audioBlob = await response.blob();
-                    const arrayBuffer = await audioBlob.arrayBuffer();
 
-                    // 创建 AudioContext 并解码音频
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                    // 初始化音频处理器
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    if (!this.processor) {
+                        this.processor = new AudioSegmentProcessor(audioContext);
+                    }
+                    // 更新 recorder 的 audioContext
+                    this.recorder.audioContext = audioContext;
 
-                    // 重新分割音频
-                    this.segments = this.splitAudioByPauses(audioBuffer);
+                    // 使用 AudioSegmentProcessor 重新分割音频
+                    const segments = await this.processor.splitByPauses(audioBlob, {
+                        silenceThreshold: data.silenceThreshold || this.silenceThreshold,
+                        volumeThreshold: data.volumeThreshold || this.volumeThreshold
+                    });
 
-                    if (this.segments.length > 0) {
+                    // 使用 SegmentManager 管理片段
+                    this.segmentMgr.clear();
+                    this.segmentMgr.add(segments);
+
+                    if (this.segmentMgr.getCount() > 0) {
                         this.displaySegments();
-                        
+
                         // 恢复播放进度
                         if (data.currentPlayingIndex !== undefined) {
                             this.currentPlayingIndex = data.currentPlayingIndex;
@@ -1947,7 +2445,7 @@
                         if (data.lastManualClickIndex !== undefined) {
                             this.lastManualClickIndex = data.lastManualClickIndex;
                         }
-                        
+
                         // 恢复已播放片段的进度条状态
                         if (data.playedSegments && Array.isArray(data.playedSegments)) {
                             data.playedSegments.forEach(index => {
@@ -1957,21 +2455,21 @@
                                 }
                             });
                         }
-                        
+
                         // 更新状态信息
                         const playedCount = data.playedSegments ? data.playedSegments.length : 0;
                         let statusMsg;
                         if (playedCount > 0) {
-                            statusMsg = `✅ ${i18n.t('statusRestoredWithProgress', { 
-                                count: this.segments.length, 
-                                played: playedCount, 
-                                total: this.segments.length 
+                            statusMsg = `✅ ${i18n.t('statusRestoredWithProgress', {
+                                count: this.segmentMgr.getCount(),
+                                played: playedCount,
+                                total: this.segmentMgr.getCount()
                             })}`;
                         } else {
-                            statusMsg = `✅ ${i18n.t('statusRestored', { count: this.segments.length })}`;
+                            statusMsg = `✅ ${i18n.t('statusRestored', { count: this.segmentMgr.getCount() })}`;
                         }
                         this.updateStatus(statusMsg, 'ready');
-                        
+
                         this.voiceControl.classList.add('active');
                         // 启用语音控制按钮
                         this.updateVoiceControlButton();
@@ -1985,145 +2483,234 @@
             }
 
             clearLocalStorage() {
-                try {
-                    localStorage.removeItem('voiceRecorderData');
-                    console.log('localStorage 已清理');
-                } catch (error) {
-                    console.error('清理 localStorage 失败:', error);
-                }
+                // 使用 SegmentManager 清理存储
+                this.segmentMgr.clearStorage();
+                console.log('localStorage 已清理');
             }
 
-            splitAudioByPauses(audioBuffer) {
-                const channelData = audioBuffer.getChannelData(0);
-                const sampleRate = audioBuffer.sampleRate;
-                const silenceSamples = Math.floor(this.silenceThreshold * sampleRate);
-                
-                // 计算每个样本的音量
-                const volumes = [];
-                const windowSize = Math.floor(sampleRate * 0.02); // 20ms window
-                
-                for (let i = 0; i < channelData.length; i += windowSize) {
-                    let sum = 0;
-                    for (let j = 0; j < windowSize && i + j < channelData.length; j++) {
-                        sum += Math.abs(channelData[i + j]);
-                    }
-                    volumes.push(sum / windowSize);
-                }
-                
-                // 查找停顿点
-                const segments = [];
-                let segmentStart = null;
-                let silenceStart = null;
-                let silenceCount = 0;
-                
-                for (let i = 0; i < volumes.length; i++) {
-                    const currentTime = i * windowSize / sampleRate;
-                    
-                    if (volumes[i] > this.volumeThreshold) {
-                        // 有声音
-                        if (segmentStart === null) {
-                            segmentStart = i * windowSize;
-                        }
-                        silenceStart = null;
-                        silenceCount = 0;
-                    } else {
-                        // 静音
-                        if (segmentStart !== null) {
-                            if (silenceStart === null) {
-                                silenceStart = i * windowSize;
-                            }
-                            silenceCount++;
-                            
-                            // 检查是否达到停顿阈值
-                            if (silenceCount * windowSize >= silenceSamples) {
-                                const segmentEnd = silenceStart;
-                                const segment = this.extractSegment(audioBuffer, segmentStart, segmentEnd);
-                                if (segment) {
-                                    segments.push(segment);
-                                }
-                                segmentStart = null;
-                                silenceStart = null;
-                                silenceCount = 0;
-                            }
-                        }
-                    }
-                }
-                
-                // 处理最后一个片段
-                if (segmentStart !== null) {
-                    const segmentEnd = channelData.length;
-                    const segment = this.extractSegment(audioBuffer, segmentStart, segmentEnd);
-                    if (segment) {
-                        segments.push(segment);
-                    }
-                }
-                
-                return segments;
-            }
-
-            extractSegment(audioBuffer, startSample, endSample) {
-                const sampleRate = audioBuffer.sampleRate;
-                const padding = Math.floor(sampleRate * 0.1); // 0.1秒的缓冲
-                
-                // 向前后扩展，但不超出边界
-                const actualStart = Math.max(0, startSample - padding);
-                const actualEnd = Math.min(audioBuffer.length, endSample + padding);
-                const length = actualEnd - actualStart;
-                
-                // 过滤太短的片段 (小于0.2秒，不包括缓冲)
-                const originalLength = endSample - startSample;
-                if (originalLength < sampleRate * 0.2) {
-                    return null;
-                }
-                
-                const numberOfChannels = audioBuffer.numberOfChannels;
-                const segmentBuffer = this.audioContext.createBuffer(
-                    numberOfChannels,
-                    length,
-                    sampleRate
-                );
-                
-                for (let channel = 0; channel < numberOfChannels; channel++) {
-                    const sourceData = audioBuffer.getChannelData(channel);
-                    const segmentData = segmentBuffer.getChannelData(channel);
-                    for (let i = 0; i < length; i++) {
-                        segmentData[i] = sourceData[actualStart + i];
-                    }
-                }
-                
-                return segmentBuffer;
-            }
+            // 旧的 splitAudioByPauses 和 extractSegment 方法已被 AudioSegmentProcessor 类替代
 
             displaySegments() {
                 this.segmentList.innerHTML = '';
                 this.segmentsContainer.style.display = 'block';
                 this.emptyState.style.display = 'none';
                 this.segmentCount.textContent = this.segments.length;
-                
+
+                // 清空旧的滑动处理器
+                this.swipeHandlers = [];
+
                 this.segments.forEach((segment, index) => {
                     const duration = segment.duration.toFixed(2);
-                    
+
                     const item = document.createElement('div');
                     item.className = 'segment-item';
                     item.id = `segment-item-${index}`;
-                    
+
                     item.innerHTML = `
-                        <div class="segment-number">#${index + 1}</div>
-                        <div class="segment-duration">${duration}${i18n.t('secondUnit')}</div>
-                        <div class="waveform">
-                            <div class="waveform-fill" id="waveform-${index}"></div>
+                        <div class="segment-content">
+                            <div class="segment-number">#${index + 1}</div>
+                            <div class="segment-duration">${duration}${i18n.t('secondUnit')}</div>
+                            <div class="waveform">
+                                <div class="waveform-fill" id="waveform-${index}"></div>
+                            </div>
+                            <button class="play-btn" data-index="${index}">${i18n.t('playButton')}</button>
                         </div>
-                        <button class="play-btn" data-index="${index}">${i18n.t('playButton')}</button>
+                        <div class="segment-actions">
+                            <button class="action-btn re-record-btn" data-index="${index}">${i18n.t('reRecord')}</button>
+                            <button class="action-btn delete-btn" data-index="${index}">${i18n.t('deleteSegment')}</button>
+                        </div>
                     `;
-                    
+
                     const playBtn = item.querySelector('.play-btn');
                     playBtn.addEventListener('click', () => {
                         this.lastManualClickIndex = index;
                         this.playSegmentTwice(index, playBtn);
                     });
-                    
+
+                    // 补录按钮
+                    const reRecordBtn = item.querySelector('.re-record-btn');
+                    reRecordBtn.addEventListener('click', () => {
+                        this.closeAllSwipes();
+                        // 滚动到页面顶部（录制面板）
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        // 延迟一点开始补录，让用户看到滚动
+                        setTimeout(() => {
+                            this.reRecordSegment(index);
+                        }, 300);
+                    });
+
+                    // 删除按钮
+                    const deleteBtn = item.querySelector('.delete-btn');
+                    deleteBtn.addEventListener('click', () => {
+                        this.closeAllSwipes();
+                        this.deleteSegment(index);
+                    });
+
+                    // 添加滑动处理
+                    this.addSwipeHandler(item, index);
+
                     this.segmentList.appendChild(item);
                 });
+            }
+
+            addSwipeHandler(item, index) {
+                const content = item.querySelector('.segment-content');
+                let startX = 0;
+                let startY = 0;
+                let currentX = 0;
+                let startTime = 0;
+                let isDragging = false;
+                let hasMoved = false;
+                const swipeThreshold = 50; // 触发滑动显示的距离
+                const movementThreshold = 10; // 区分点击和滑动的最小移动距离
+                const tapMaxDuration = 300; // 点击的最大持续时间（毫秒）
+
+                const handleTouchStart = (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    currentX = startX;
+                    startTime = Date.now();
+                    isDragging = true;
+                    hasMoved = false;
+                };
+
+                const handleTouchMove = (e) => {
+                    if (!isDragging) return;
+
+                    currentX = e.touches[0].clientX;
+                    const diffX = currentX - startX;
+                    const diffY = Math.abs(e.touches[0].clientY - startY);
+
+                    // 只有当水平移动超过阈值，且水平移动大于垂直移动时，才认为是滑动
+                    if (Math.abs(diffX) > movementThreshold && Math.abs(diffX) > diffY) {
+                        hasMoved = true;
+
+                        // 只允许向左滑
+                        if (diffX < 0) {
+                            const translateX = Math.max(diffX, -140);
+                            content.style.transform = `translateX(${translateX}px)`;
+                            content.style.transition = 'none';
+                            e.preventDefault();
+                        }
+                    }
+                };
+
+                const handleTouchEnd = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+
+                    const diffX = currentX - startX;
+                    const distance = Math.abs(diffX);
+                    const duration = Date.now() - startTime;
+
+                    content.style.transition = 'transform 0.3s ease';
+
+                    // 判断是点击还是滑动
+                    if (!hasMoved || distance < movementThreshold || duration < 100) {
+                        // 这是一个点击 - 关闭所有动作按钮，恢复正常位置
+                        this.closeSwipe(content);
+                        this.closeAllSwipes();
+                    } else if (distance > swipeThreshold && diffX < 0) {
+                        // 这是一个向左滑动 - 显示动作按钮
+                        this.closeAllSwipesExcept(index);
+                        content.classList.add('swiped');
+                        content.style.transform = 'translateX(-140px)';
+                    } else {
+                        // 移动了但不够触发 - 恢复正常位置
+                        this.closeSwipe(content);
+                    }
+                };
+
+                content.addEventListener('touchstart', handleTouchStart, { passive: false });
+                content.addEventListener('touchmove', handleTouchMove, { passive: false });
+                content.addEventListener('touchend', handleTouchEnd);
+
+                // 保存处理器以便后续清理
+                this.swipeHandlers.push({
+                    element: content,
+                    handlers: { handleTouchStart, handleTouchMove, handleTouchEnd }
+                });
+            }
+
+            closeSwipe(content) {
+                content.classList.remove('swiped');
+                content.style.transform = 'translateX(0)';
+            }
+
+            closeAllSwipesExcept(exceptIndex) {
+                document.querySelectorAll('.segment-content').forEach((content, i) => {
+                    if (i !== exceptIndex) {
+                        this.closeSwipe(content);
+                    }
+                });
+            }
+
+            closeAllSwipes() {
+                document.querySelectorAll('.segment-content').forEach(content => {
+                    this.closeSwipe(content);
+                });
+            }
+
+            deleteSegment(index) {
+                // 确认删除
+                const confirmMsg = i18n.t('deleteConfirm');
+                if (!confirm(confirmMsg)) {
+                    return;
+                }
+
+                // 使用 SegmentManager 删除片段
+                const success = this.segmentMgr.delete(index);
+                if (!success) {
+                    console.error('删除片段失败');
+                    return;
+                }
+
+                // 更新播放索引
+                if (this.currentPlayingIndex === index) {
+                    this.currentlyPlaying?.source.stop();
+                    this.currentPlayingIndex = -1;
+                } else if (this.currentPlayingIndex > index) {
+                    this.currentPlayingIndex--;
+                }
+
+                if (this.lastManualClickIndex === index) {
+                    this.lastManualClickIndex = -1;
+                } else if (this.lastManualClickIndex > index) {
+                    this.lastManualClickIndex--;
+                }
+
+                // 重新渲染列表
+                this.displaySegments();
+
+                // 更新计数
+                this.segmentCount.textContent = this.segmentMgr.getCount();
+
+                // 如果删完了，显示空状态
+                if (this.segmentMgr.getCount() === 0) {
+                    this.segmentsContainer.style.display = 'none';
+                    this.emptyState.style.display = 'block';
+                    this.voiceControl.classList.remove('active');
+                    if (this.isVoiceControlActive) {
+                        this.stopVoiceControl();
+                    }
+                }
+
+                // 保存到 localStorage
+                this.saveToLocalStorage();
+
+                console.log(`片段 ${index + 1} 已删除`);
+            }
+
+            async reRecordSegment(index) {
+                console.log(`开始补录片段 ${index + 1}`);
+
+                // 关闭语音控制（如果开启）
+                if (this.isVoiceControlActive) {
+                    this.stopVoiceControl();
+                }
+
+                // 开始补录模式录音
+                await this.startRecording('rerecord', index);
             }
 
             updateCurrentPlayingUI(index) {
@@ -2223,9 +2810,18 @@
             playSegmentOnce(index, button, playbackId) {
                 return new Promise((resolve) => {
                     const segment = this.segments[index];
-                    const source = this.audioContext.createBufferSource();
+
+                    // 获取或创建 audioContext
+                    let audioContext = this.recorder.getAudioContext();
+                    if (!audioContext) {
+                        // 如果 recorder 的 audioContext 不存在，创建一个新的
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        this.recorder.audioContext = audioContext;
+                    }
+
+                    const source = audioContext.createBufferSource();
                     source.buffer = segment;
-                    source.connect(this.audioContext.destination);
+                    source.connect(audioContext.destination);
 
                     // 只改变样式，不改变文字
                     button.classList.add('playing');
