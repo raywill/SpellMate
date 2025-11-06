@@ -966,7 +966,7 @@
 
         <!-- 版本信息 -->
         <div class="version-info">
-            v0.1@raywill
+            v0.11@raywill
         </div>
     </div>
 
@@ -2532,8 +2532,7 @@
                     if (!this.processor) {
                         this.processor = new AudioSegmentProcessor(audioContext);
                     }
-                    // 更新 recorder 的 audioContext
-                    this.recorder.audioContext = audioContext;
+                    // 注意：此处不再把 audioContext 赋给 recorder，避免在非用户手势中创建的上下文影响播放
 
                     // 使用 AudioSegmentProcessor 重新分割音频
                     const segments = await this.processor.splitByPauses(audioBlob, {
@@ -2635,6 +2634,14 @@
                         // 关键修复：在用户点击的同步调用栈中创建 AudioContext（iOS 要求）
                         if (!this.recorder.audioContext) {
                             this.recorder.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        }
+                        // 确保在用户手势中恢复上下文（iOS 静音模式需要）
+                        if (this.recorder.audioContext && this.recorder.audioContext.state !== 'running') {
+                            try {
+                                this.recorder.audioContext.resume();
+                            } catch (e) {
+                                console.warn('AudioContext 恢复失败:', e);
+                            }
                         }
 
                         this.lastManualClickIndex = index;
@@ -2925,9 +2932,17 @@
                     // 获取或创建 audioContext
                     let audioContext = this.recorder.getAudioContext();
                     if (!audioContext) {
-                        alert('警告：AudioContext 未在用户手势中创建！iOS 静音模式可能无声音。');
+                        console.log('警告：AudioContext 未在用户手势中创建！iOS 静音模式可能无声音。');
                         audioContext = new (window.AudioContext || window.webkitAudioContext)();
                         this.recorder.audioContext = audioContext;
+                    }
+                    // 兜底：在真正播放前尝试恢复上下文（若仍为 suspended）
+                    if (audioContext && audioContext.state !== 'running') {
+                        try {
+                            audioContext.resume();
+                        } catch (e) {
+                            console.warn('AudioContext 恢复失败（播放前兜底）:', e);
+                        }
                     }
 
                     const source = audioContext.createBufferSource();
