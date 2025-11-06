@@ -352,6 +352,60 @@
             text-align: right;
         }
 
+        /* 移动端：设置项标题和控件分两行显示 */
+        @media (max-width: 768px) {
+            .setting-item {
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 15px;
+            }
+
+            .setting-item label {
+                width: 100%;
+                min-width: unset;
+                font-weight: 500;
+                margin-bottom: 4px;
+            }
+
+            .setting-item input[type="range"] {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .setting-item .value {
+                min-width: 70px;
+                text-align: right;
+            }
+
+            /* 自动播放项的特殊处理 */
+            .autoplay-item {
+                flex-wrap: wrap;
+            }
+
+            .autoplay-item label {
+                width: 100%;
+                order: -1;
+            }
+
+            .autoplay-item .autoplay-label-fast,
+            .autoplay-item .autoplay-label-slow {
+                font-size: 12px;
+                flex-shrink: 0;
+                min-width: 20px;
+            }
+
+            .autoplay-item input[type="range"] {
+                flex: 1 1 0;
+                min-width: 0 !important;
+                width: auto;
+            }
+
+            .autoplay-item .value {
+                flex-shrink: 0;
+                min-width: 50px;
+            }
+        }
+
         .autoplay-item {
             display: flex;
             align-items: center;
@@ -727,16 +781,6 @@
             </div>
             <div class="settings-content" id="settingsContent">
                 <div class="setting-item">
-                    <label>停顿阈值:</label>
-                    <input type="range" id="silenceThreshold" min="0.2" max="3" step="0.1" value="0.3">
-                    <span class="value" id="silenceValue">1.0</span>
-                </div>
-                <div class="setting-item">
-                    <label>音量阈值:</label>
-                    <input type="range" id="volumeThreshold" min="0.001" max="0.05" step="0.001" value="0.01">
-                    <span class="value" id="volumeValue">0.010</span>
-                </div>
-                <div class="setting-item">
                     <label>重复播报:</label>
                     <input type="range" id="repeatCount" min="1" max="6" step="1" value="1">
                     <span class="value" id="repeatValue">1 次</span>
@@ -753,6 +797,16 @@
                     <div class="language-selector" id="languageSelector">
                         <!-- 动态生成语言按钮 -->
                     </div>
+                </div>
+                <div class="setting-item">
+                    <label>停顿阈值:</label>
+                    <input type="range" id="silenceThreshold" min="0.2" max="3" step="0.1" value="0.3">
+                    <span class="value" id="silenceValue">0.3</span>
+                </div>
+                <div class="setting-item">
+                    <label>音量阈值:</label>
+                    <input type="range" id="volumeThreshold" min="0.001" max="0.05" step="0.001" value="0.01">
+                    <span class="value" id="volumeValue">0.010</span>
                 </div>
             </div>
         </div>
@@ -1082,18 +1136,25 @@
                 // 高级设置
                 const settingsTitle = document.querySelector('.settings-header h3');
                 if (settingsTitle) settingsTitle.textContent = `⚙️ ${i18n.t('settingsTitle')}`;
-                
+
                 const settingLabels = document.querySelectorAll('.setting-item label');
-                if (settingLabels[0]) settingLabels[0].textContent = i18n.t('settingSilence');
-                if (settingLabels[1]) settingLabels[1].textContent = i18n.t('settingVolume');
-                if (settingLabels[2]) settingLabels[2].textContent = i18n.t('settingRepeatCount');
-                if (settingLabels[3]) settingLabels[3].textContent = i18n.t('settingAutoPlay');
+                if (settingLabels[0]) settingLabels[0].textContent = i18n.t('settingRepeatCount');
+                if (settingLabels[1]) settingLabels[1].textContent = i18n.t('settingAutoPlay');
+                // settingLabels[2] 是语言，有 data-i18n 属性，单独处理
+                if (settingLabels[3]) settingLabels[3].textContent = i18n.t('settingSilence');
+                if (settingLabels[4]) settingLabels[4].textContent = i18n.t('settingVolume');
 
                 // 自动播放快慢标签
                 const autoplayFast = document.querySelector('.autoplay-label-fast');
                 const autoplaySlow = document.querySelector('.autoplay-label-slow');
                 if (autoplayFast) autoplayFast.textContent = i18n.t('autoPlayFast');
                 if (autoplaySlow) autoplaySlow.textContent = i18n.t('autoPlaySlow');
+
+                // 更新停顿阈值显示值（包括单位）
+                this.silenceValue.textContent = this.silenceThreshold.toFixed(1) + `${i18n.t('secondUnit')}`;
+
+                // 更新音量阈值显示值
+                this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
 
                 // 更新重复播报显示值
                 this.repeatValue.textContent = this.repeatCount + ` ${i18n.t('timesUnit')}`;

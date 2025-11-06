@@ -331,22 +331,22 @@ const i18n = {
             statusRestoredWithProgress: '{count} Segmente wiederhergestellt (abgeschlossen {played}/{total})',
             statusNoSegments: 'Keine gültigen Sprachsegmente erkannt',
             statusInterrupted: 'Aufnahme unterbrochen, bitte neu starten',
-            
+
             visualizerLabel: 'Live-Audio-Wellenform',
-            
+
             voiceControlTitle: 'Sprachsteuerung',
             voiceControlOff: 'Sprachsteuerung aus',
             voiceControlListening: 'Hört zu...',
             voiceControlWaiting: 'Warten auf Befehl...',
             voiceControlPaused: 'Sprachsteuerung pausiert (Wiedergabe)',
             voiceControlPausedDetail: '⏸️ Audio wird abgespielt, Spracherkennung pausiert...',
-            
+
             commandsTitle: 'Verfügbare Befehle:',
             commandStart: 'Start - Diktat beginnen',
             commandNext: 'Weiter - Nächstes Segment',
             commandReplay: 'Wiederholen - Aktuelles Segment',
             commandPrevious: 'Zurück - Vorheriges Segment',
-            
+
             settingsTitle: 'Erweiterte Einstellungen',
             settingSilence: 'Pausenschwelle:',
             settingVolume: 'Lautstärkeschwelle:',
@@ -354,8 +354,8 @@ const i18n = {
             settingAutoPlay: 'Auto-Wiedergabe:',
             autoPlayFast: 'Schnell',
             autoPlaySlow: 'Langsam',
-            autoPlayEnabled: 'Aktiviert',
-            autoPlayDisabled: 'Deaktiviert',
+            autoPlayEnabled: 'An',
+            autoPlayDisabled: 'Aus',
             settingLanguage: 'Sprache:',
             timesUnit: 'mal',
             
@@ -398,22 +398,22 @@ const i18n = {
             statusRestoredWithProgress: '{count} segmentos restaurados (completado {played}/{total})',
             statusNoSegments: 'No se detectaron segmentos de voz válidos',
             statusInterrupted: 'Grabación interrumpida, por favor reinicie',
-            
+
             visualizerLabel: 'Forma de onda en vivo',
-            
+
             voiceControlTitle: 'Control por voz',
             voiceControlOff: 'Control por voz desactivado',
             voiceControlListening: 'Escuchando...',
             voiceControlWaiting: 'Esperando comando...',
             voiceControlPaused: 'Control por voz pausado (reproduciendo)',
             voiceControlPausedDetail: '⏸️ Reproduciendo audio, reconocimiento de voz pausado...',
-            
+
             commandsTitle: 'Comandos disponibles:',
             commandStart: 'Empezar - Iniciar dictado',
             commandNext: 'Siguiente - Siguiente segmento',
             commandReplay: 'Repetir - Repetir segmento',
             commandPrevious: 'Anterior - Segmento anterior',
-            
+
             settingsTitle: 'Configuración avanzada',
             settingSilence: 'Umbral de silencio:',
             settingVolume: 'Umbral de volumen:',
@@ -421,8 +421,8 @@ const i18n = {
             settingAutoPlay: 'Reproducción auto:',
             autoPlayFast: 'Rápido',
             autoPlaySlow: 'Lento',
-            autoPlayEnabled: 'Activado',
-            autoPlayDisabled: 'Desactivado',
+            autoPlayEnabled: 'Sí',
+            autoPlayDisabled: 'No',
             settingLanguage: 'Idioma:',
             timesUnit: 'veces',
             
@@ -532,22 +532,22 @@ const i18n = {
             statusRestoredWithProgress: 'Восстановлено {count} сегментов (завершено {played}/{total})',
             statusNoSegments: 'Не обнаружено действительных голосовых сегментов',
             statusInterrupted: 'Запись прервана, пожалуйста, начните заново',
-            
+
             visualizerLabel: 'Форма волны в реальном времени',
-            
+
             voiceControlTitle: 'Голосовое управление',
             voiceControlOff: 'Голосовое управление выключено',
             voiceControlListening: 'Слушаю...',
             voiceControlWaiting: 'Ожидание команды...',
             voiceControlPaused: 'Голосовое управление приостановлено (воспроизведение)',
             voiceControlPausedDetail: '⏸️ Воспроизведение аудио, распознавание речи приостановлено...',
-            
+
             commandsTitle: 'Доступные команды:',
             commandStart: 'Начать - Начать диктант',
             commandNext: 'Далее - Следующий сегмент',
             commandReplay: 'Повтор - Повторить текущий сегмент',
             commandPrevious: 'Назад - Предыдущий сегмент',
-            
+
             settingsTitle: 'Расширенные настройки',
             settingSilence: 'Порог тишины:',
             settingVolume: 'Порог громкости:',
@@ -555,8 +555,8 @@ const i18n = {
             settingAutoPlay: 'Авто воспроизведение:',
             autoPlayFast: 'Быстро',
             autoPlaySlow: 'Медленно',
-            autoPlayEnabled: 'Включено',
-            autoPlayDisabled: 'Отключено',
+            autoPlayEnabled: 'Вкл',
+            autoPlayDisabled: 'Выкл',
             settingLanguage: 'Язык:',
             timesUnit: 'раз',
             
