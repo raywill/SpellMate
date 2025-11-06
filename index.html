@@ -30,7 +30,7 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- i18n 多语言支持 -->
-    <script src="i18n.js?v=202511052300"></script>
+    <script src="i18n.js?v=202511061200"></script>
     
     <style>
         * {
@@ -552,6 +552,37 @@
             margin-top: 10px;
         }
 
+        /* 停顿提示球 */
+        .pause-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            background: rgba(16, 185, 129, 0.6);
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            animation: breathe 2s ease-in-out infinite;
+        }
+
+        .pause-indicator.show {
+            opacity: 1;
+        }
+
+        @keyframes breathe {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.2);
+                box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
+            }
+        }
+
         .voice-control {
             margin: 20px 0;
             padding: 20px;
@@ -837,7 +868,10 @@
         <div id="status" class="status idle">准备就绪</div>
 
         <div class="visualizer-container" id="visualizerContainer">
-            <canvas id="audioVisualizer"></canvas>
+            <div style="position: relative;">
+                <canvas id="audioVisualizer"></canvas>
+                <div class="pause-indicator" id="pauseIndicator"></div>
+            </div>
             <div class="visualizer-label">🎵 实时音频波形</div>
         </div>
 
@@ -897,7 +931,7 @@
         </div>
 
         <div class="segments" id="segmentsContainer" style="display: none;">
-            <h2>📝 录音片段 (<span id="segmentCount">0</span>)</h2>
+            <h2 id="segmentsTitle">📝 录音片段</h2>
             <div class="segment-list" id="segmentList"></div>
             <div class="add-segment-container" style="margin-top: 20px; text-align: center;">
                 <button id="addSegmentBtn" class="add-segment-btn">➕ <span data-i18n="addSegment">添加片段</span></button>
@@ -1279,6 +1313,11 @@
                 // 滑动交互相关
                 this.swipeHandlers = []; // 存储每个片段的滑动处理器
 
+                // 实时停顿检测相关
+                this.silenceStartTime = 0; // 静音开始时间
+                this.isSilent = false; // 当前是否处于静音状态
+                this.pauseIndicatorShown = false; // 停顿提示是否已显示
+
                 this.initElements();
                 this.initLanguageSelector(); // 初始化语言选择器
                 this.updateUI(); // 更新所有界面文本
@@ -1302,7 +1341,6 @@
                 this.segmentList = document.getElementById('segmentList');
                 this.segmentsContainer = document.getElementById('segmentsContainer');
                 this.emptyState = document.getElementById('emptyState');
-                this.segmentCount = document.getElementById('segmentCount');
                 this.silenceThresholdInput = document.getElementById('silenceThreshold');
                 this.silenceValue = document.getElementById('silenceValue');
                 this.volumeThresholdInput = document.getElementById('volumeThreshold');
@@ -1314,7 +1352,8 @@
                 this.visualizerContainer = document.getElementById('visualizerContainer');
                 this.canvas = document.getElementById('audioVisualizer');
                 this.canvasCtx = this.canvas.getContext('2d');
-                
+                this.pauseIndicator = document.getElementById('pauseIndicator');
+
                 // 语音控制元素
                 this.voiceControl = document.getElementById('voiceControl');
                 this.voiceControlBtn = document.getElementById('voiceControlBtn');
@@ -1591,10 +1630,9 @@
                 }
 
                 // 片段标题
-                const segmentsTitle = document.querySelector('#segmentsContainer h2');
+                const segmentsTitle = document.querySelector('#segmentsTitle');
                 if (segmentsTitle) {
-                    const count = this.segmentCount.textContent;
-                    segmentsTitle.innerHTML = `📝 ${i18n.t('segmentsTitle')} (<span id="segmentCount">${count}</span>)`;
+                    segmentsTitle.textContent = `📝 ${i18n.t('segmentsTitle')}`;
                 }
                 
                 // 播放按钮
@@ -2070,6 +2108,12 @@
                     }
                     this.updateStatus(`🔴 ${statusText}`, 'recording');
 
+                    // 重置停顿检测状态
+                    this.silenceStartTime = 0;
+                    this.isSilent = false;
+                    this.pauseIndicatorShown = false;
+                    this.pauseIndicator.classList.remove('show');
+
                     // 显示可视化容器并开始绘制波形
                     this.visualizerContainer.classList.add('active');
                     this.drawWaveform();
@@ -2097,8 +2141,9 @@
                         this.animationId = null;
                     }
 
-                    // 隐藏可视化容器
+                    // 隐藏可视化容器和停顿提示
                     this.visualizerContainer.classList.remove('active');
+                    this.pauseIndicator.classList.remove('show');
 
                     this.startBtn.disabled = false;
                     this.stopBtn.disabled = true;
@@ -2116,39 +2161,78 @@
                 if (!this.isRecording) {
                     return;
                 }
-                
+
                 this.animationId = requestAnimationFrame(() => this.drawWaveform());
-                
+
                 this.analyser.getByteTimeDomainData(this.dataArray);
-                
+
+                // 计算当前音量（用于检测停顿）
+                let sum = 0;
+                for (let i = 0; i < this.dataArray.length; i++) {
+                    const normalized = (this.dataArray[i] - 128) / 128.0; // 归一化到-1到1
+                    sum += Math.abs(normalized);
+                }
+                const avgVolume = sum / this.dataArray.length;
+
+                // 检测静音和停顿
+                const currentTime = Date.now();
+                const isSilentNow = avgVolume < this.volumeThreshold;
+
+                if (isSilentNow) {
+                    // 当前是静音
+                    if (!this.isSilent) {
+                        // 刚开始静音
+                        this.isSilent = true;
+                        this.silenceStartTime = currentTime;
+                        this.pauseIndicatorShown = false;
+                    } else {
+                        // 持续静音中
+                        const silenceDuration = (currentTime - this.silenceStartTime) / 1000; // 转换为秒
+
+                        // 如果静音时间超过阈值，显示停顿提示
+                        if (silenceDuration >= this.silenceThreshold && !this.pauseIndicatorShown) {
+                            this.pauseIndicator.classList.add('show');
+                            this.pauseIndicatorShown = true;
+                        }
+                    }
+                } else {
+                    // 当前有声音
+                    if (this.isSilent) {
+                        // 从静音恢复到有声音，隐藏提示
+                        this.isSilent = false;
+                        this.pauseIndicator.classList.remove('show');
+                        this.pauseIndicatorShown = false;
+                    }
+                }
+
                 // 清空canvas
                 this.canvasCtx.fillStyle = 'rgb(17, 24, 39)';
                 this.canvasCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                
+
                 // 绘制波形
                 this.canvasCtx.lineWidth = 2;
                 this.canvasCtx.strokeStyle = 'rgb(16, 185, 129)'; // 绿色
                 this.canvasCtx.beginPath();
-                
+
                 const sliceWidth = this.canvas.width * 1.0 / this.dataArray.length;
                 let x = 0;
-                
+
                 for (let i = 0; i < this.dataArray.length; i++) {
                     const v = this.dataArray[i] / 128.0; // 归一化到0-2
                     const y = v * this.canvas.height / 2;
-                    
+
                     if (i === 0) {
                         this.canvasCtx.moveTo(x, y);
                     } else {
                         this.canvasCtx.lineTo(x, y);
                     }
-                    
+
                     x += sliceWidth;
                 }
-                
+
                 this.canvasCtx.lineTo(this.canvas.width, this.canvas.height / 2);
                 this.canvasCtx.stroke();
-                
+
                 // 添加中线作为参考
                 this.canvasCtx.strokeStyle = 'rgba(107, 114, 128, 0.3)';
                 this.canvasCtx.lineWidth = 1;
@@ -2494,7 +2578,6 @@
                 this.segmentList.innerHTML = '';
                 this.segmentsContainer.style.display = 'block';
                 this.emptyState.style.display = 'none';
-                this.segmentCount.textContent = this.segments.length;
 
                 // 清空旧的滑动处理器
                 this.swipeHandlers = [];
@@ -2681,9 +2764,6 @@
 
                 // 重新渲染列表
                 this.displaySegments();
-
-                // 更新计数
-                this.segmentCount.textContent = this.segmentMgr.getCount();
 
                 // 如果删完了，显示空状态
                 if (this.segmentMgr.getCount() === 0) {
