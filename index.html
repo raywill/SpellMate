@@ -45,8 +45,8 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 2px;
-            background-color: rgba(173, 216, 230, 0.2);
+            height: 10px;
+            background-color: rgba(16, 185, 129, 0.1);
             z-index: 9999;
             opacity: 0;
             visibility: hidden;
@@ -61,9 +61,9 @@
         .autoplay-progress-fill {
             height: 100%;
             width: 100%;
-            background: linear-gradient(90deg, #87CEEB 0%, #4FC3F7 100%);
+            background: #10b981;
             transition: width 0.1s linear;
-            box-shadow: 0 0 8px rgba(135, 206, 235, 0.6);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
         }
 
         body {
@@ -955,7 +955,7 @@
             <div class="settings-content" id="settingsContent">
                 <div class="setting-item">
                     <label>重复播报:</label>
-                    <input type="range" id="repeatCount" min="1" max="6" step="1" value="1">
+                    <input type="range" id="repeatCount" min="1" max="6" step="1" value="2">
                     <span class="value" id="repeatValue">1 次</span>
                 </div>
                 <div class="setting-item autoplay-item">
@@ -1402,7 +1402,7 @@
                 this.volumeThreshold = 0.03; // 音量阈值
                 this.autoPlayInterval = 10; // 自动播放间隔倍数，30表示禁用（手动模式）
                 this.autoPlayTimer = null; // 自动播放定时器
-                this.repeatCount = 1; // 重复播报次数，默认1次
+                this.repeatCount = 2; // 重复播报次数，默认2次
 
                 // 进度条控制
                 this.progressBar = document.getElementById('autoplayProgressBar');
@@ -2159,6 +2159,15 @@
                     // 如果自动播放启用（值小于30），立即开始播放第一个片段
                     if (this.autoPlayInterval < 30 && this.segments.length > 0) {
                         console.log('自动播放已启用，立即播放第一个片段');
+
+                        // 如果已经到达末尾，重置到第一个片段
+                        if (this.lastManualClickIndex >= this.segments.length ||
+                            this.currentPlayingIndex >= this.segments.length) {
+                            console.log('已到达末尾，重新从第一个片段开始');
+                            this.lastManualClickIndex = -1;
+                            this.currentPlayingIndex = -1;
+                        }
+
                         setTimeout(() => {
                             this.playNext();
                         }, 500);
