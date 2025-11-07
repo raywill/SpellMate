@@ -30,7 +30,7 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- i18n 多语言支持 -->
-    <script src="i18n.js?v=202511052300"></script>
+    <script src="i18n.js?v=202511062224"></script>
     
     <style>
         * {
@@ -965,16 +965,69 @@
         </div>
 
         <!-- 版本信息 -->
-        <div class="version-info">
+        <div class="version-info" id="versionInfo">
             v0.11@raywill
         </div>
     </div>
 
     <script>
+        // 应用版本号
+        const APP_VERSION = '0.11';
+
         // 检测是否在微信浏览器中
         function isWeChat() {
             const ua = navigator.userAgent.toLowerCase();
             return ua.indexOf('micromessenger') !== -1;
+        }
+
+        // 版本检查和管理
+        function checkVersion() {
+            try {
+                const savedVersion = localStorage.getItem('appVersion');
+
+                // 如果没有保存的版本号，或者版本号不一致
+                if (!savedVersion || savedVersion !== APP_VERSION) {
+                    console.log(`版本升级: ${savedVersion || '未知'} -> ${APP_VERSION}`);
+
+                    // 清除所有相关的 localStorage 数据
+                    localStorage.removeItem('voiceRecorderData');
+                    localStorage.removeItem('voiceRecorderSettings');
+
+                    // 保存新版本号
+                    localStorage.setItem('appVersion', APP_VERSION);
+
+                    // 如果有旧版本（不是首次使用），则显示升级提示
+                    if (savedVersion) {
+                        return true; // 需要显示升级提示
+                    }
+                }
+
+                return false; // 无需显示升级提示
+            } catch (error) {
+                console.error('版本检查失败:', error);
+                return false;
+            }
+        }
+
+        // 显示版本升级提示
+        function showVersionUpgradeAlert() {
+            // 检查 i18n 是否已初始化
+            if (typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+                // i18n 已初始化，使用本地化消息
+                const message = i18n.t('alertVersionUpgrade', { version: APP_VERSION });
+                alert(message);
+            } else {
+                // i18n 未初始化，使用固定的英文版本
+                alert(`New version v${APP_VERSION} detected, automatically upgraded`);
+            }
+        }
+
+        // 更新 footer 版本号显示
+        function updateVersionInfo() {
+            const versionInfo = document.getElementById('versionInfo');
+            if (versionInfo) {
+                versionInfo.textContent = `v${APP_VERSION}@raywill`;
+            }
         }
 
         // 如果在微信中，显示提示并阻止应用加载
@@ -1416,7 +1469,7 @@
 
                 this.volumeThresholdInput.addEventListener('input', (e) => {
                     this.volumeThreshold = parseFloat(e.target.value);
-                    this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
+                    this.volumeValue.textContent = this.getVolumeLevelText(this.volumeThreshold);
                     this.saveSettings();
                 });
 
@@ -1640,7 +1693,7 @@
                 this.silenceValue.textContent = this.silenceThreshold.toFixed(1) + `${i18n.t('secondUnit')}`;
 
                 // 更新音量阈值显示值
-                this.volumeValue.textContent = this.volumeThreshold.toFixed(3);
+                this.volumeValue.textContent = this.getVolumeLevelText(this.volumeThreshold);
 
                 // 更新重复播报显示值
                 this.repeatValue.textContent = this.repeatCount + ` ${i18n.t('timesUnit')}`;
@@ -1717,6 +1770,17 @@
                 }
             }
 
+            getVolumeLevelText(value) {
+                // 根据音量阈值返回对应的文本
+                if (value <= 0.02) {
+                    return i18n.t('volumeLevelSoft');
+                } else if (value > 0.02 && value <= 0.04) {
+                    return i18n.t('volumeLevelNormal');
+                } else {
+                    return i18n.t('volumeLevelLoud');
+                }
+            }
+
             saveSettings() {
                 // 保存设置到单独的 localStorage 项（需求3）
                 try {
@@ -1748,7 +1812,7 @@
                         if (settings.volumeThreshold !== undefined) {
                             this.volumeThreshold = settings.volumeThreshold;
                             this.volumeThresholdInput.value = settings.volumeThreshold;
-                            this.volumeValue.textContent = settings.volumeThreshold.toFixed(3);
+                            this.volumeValue.textContent = this.getVolumeLevelText(settings.volumeThreshold);
                         }
 
                         if (settings.repeatCount !== undefined) {
@@ -3006,7 +3070,22 @@
         // 初始化应用（仅在非微信浏览器中）
         let recorder = null;
         if (!isWeChat()) {
+            // 检查版本并清理旧数据（如果需要）
+            const shouldShowUpgradeAlert = checkVersion();
+
+            // 更新 footer 版本号显示
+            updateVersionInfo();
+
+            // 初始化应用
             recorder = new VoiceRecorder();
+
+            // 如果需要，显示版本升级提示
+            if (shouldShowUpgradeAlert) {
+                // 延迟显示，确保 i18n 已经初始化完成
+                setTimeout(() => {
+                    showVersionUpgradeAlert();
+                }, 500);
+            }
         }
     </script>
 </body>
