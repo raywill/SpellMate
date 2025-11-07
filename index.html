@@ -30,13 +30,40 @@
     <link rel="manifest" href="manifest.json">
     
     <!-- i18n 多语言支持 -->
-    <script src="i18n.js?v=0.121"></script>
+    <script src="i18n.js?v=0.124"></script>
     
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        /* 自动播报进度条 */
+        .autoplay-progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: rgba(173, 216, 230, 0.2);
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease-in-out, visibility 0.2s;
+        }
+
+        .autoplay-progress-bar.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .autoplay-progress-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #87CEEB 0%, #4FC3F7 100%);
+            transition: width 0.1s linear;
+            box-shadow: 0 0 8px rgba(135, 206, 235, 0.6);
         }
 
         body {
@@ -858,6 +885,11 @@
     </script>
 </head>
 <body>
+    <!-- 自动播报进度条 -->
+    <div class="autoplay-progress-bar" id="autoplayProgressBar">
+        <div class="autoplay-progress-fill" id="autoplayProgressFill"></div>
+    </div>
+
     <!-- 微信浏览器提示 -->
     <div class="wechat-tip" id="wechatTip">
         <div class="wechat-tip-content">
@@ -929,7 +961,7 @@
                 <div class="setting-item autoplay-item">
                     <label>自动播放:</label>
                     <span class="autoplay-label-fast">快</span>
-                    <input type="range" id="autoPlayInterval" min="0" max="100" step="1" value="100">
+                    <input type="range" id="autoPlayInterval" min="0" max="30" step="1" value="5">
                     <span class="autoplay-label-slow">慢</span>
                     <span class="value" id="autoPlayValue">禁用</span>
                 </div>
@@ -966,13 +998,13 @@
 
         <!-- 版本信息 -->
         <div class="version-info" id="versionInfo">
-            v0.12@raywill
+            v0.124@raywill
         </div>
     </div>
 
     <script>
         // 应用版本号
-        const APP_VERSION = '0.12';
+        const APP_VERSION = '0.124';
 
         // 检测是否在微信浏览器中
         function isWeChat() {
@@ -1368,9 +1400,16 @@
                 // 设置参数
                 this.silenceThreshold = 0.3; // 秒
                 this.volumeThreshold = 0.03; // 音量阈值
-                this.autoPlayInterval = 100; // 自动播放间隔，100表示禁用
+                this.autoPlayInterval = 10; // 自动播放间隔倍数，30表示禁用（手动模式）
                 this.autoPlayTimer = null; // 自动播放定时器
                 this.repeatCount = 1; // 重复播报次数，默认1次
+
+                // 进度条控制
+                this.progressBar = document.getElementById('autoplayProgressBar');
+                this.progressFill = document.getElementById('autoplayProgressFill');
+                this.progressInterval = null; // 进度条更新定时器
+                this.progressStartTime = 0; // 进度开始时间
+                this.progressDuration = 0; // 进度总时长
 
                 // 播放控制
                 this.currentlyPlaying = null;
@@ -1761,12 +1800,36 @@
                 }
             }
 
-            updateAutoPlayValue() {
-                // 更新自动播放显示值：100=禁用，0-99=启用
-                if (this.autoPlayInterval >= 100) {
-                    this.autoPlayValue.textContent = i18n.t('autoPlayDisabled');
+            getAutoPlayLabelText(value) {
+                // 根据自动播报间隔倍数返回对应的文本
+                if (value === 0) {
+                    return i18n.t('autoPlayContinuous');
+                } else if (value >= 1 && value <= 2) {
+                    return i18n.t('autoPlayVeryShorter');
+                } else if (value >= 3 && value <= 4) {
+                    return i18n.t('autoPlayShorter');
+                } else if (value >= 5 && value <= 10) {
+                    return i18n.t('autoPlayModerate');
+                } else if (value > 10 && value <= 20) {
+                    return i18n.t('autoPlayLonger');
+                } else if (value > 20 && value < 30) {
+                    return i18n.t('autoPlayVeryLong');
+                } else if (value === 30) {
+                    return i18n.t('autoPlayManual');
                 } else {
-                    this.autoPlayValue.textContent = i18n.t('autoPlayEnabled');
+                    return i18n.t('autoPlayModerate');
+                }
+            }
+
+            updateAutoPlayValue() {
+                // 更新自动播放显示值
+                const labelText = this.getAutoPlayLabelText(this.autoPlayInterval);
+                if (this.autoPlayInterval < 30) {
+                    // 显示格式：value - 文案
+                    this.autoPlayValue.textContent = `${this.autoPlayInterval} - ${labelText}`;
+                } else {
+                    // value = 30 时只显示"手动"
+                    this.autoPlayValue.textContent = labelText;
                 }
             }
 
@@ -1778,6 +1841,58 @@
                     return i18n.t('volumeLevelNormal');
                 } else {
                     return i18n.t('volumeLevelLoud');
+                }
+            }
+
+            // 进度条控制方法
+            startProgressBar(duration) {
+                // 停止之前的进度条
+                this.stopProgressBar();
+
+                // 如果duration为0或负数，不显示进度条
+                if (duration <= 0) {
+                    return;
+                }
+
+                // 重置进度到100%
+                this.progressFill.style.width = '100%';
+
+                // 显示进度条（带渐现效果）
+                this.progressBar.classList.add('show');
+
+                this.progressStartTime = Date.now();
+                this.progressDuration = duration * 1000; // 转换为毫秒
+
+                // 每100ms更新一次进度
+                this.progressInterval = setInterval(() => {
+                    const elapsed = Date.now() - this.progressStartTime;
+                    const remaining = Math.max(0, this.progressDuration - elapsed);
+                    const progress = (remaining / this.progressDuration) * 100;
+
+                    this.progressFill.style.width = `${progress}%`;
+
+                    // 如果倒计时完成，停止更新
+                    if (remaining <= 0) {
+                        this.stopProgressBar();
+                    }
+                }, 100);
+            }
+
+            stopProgressBar() {
+                // 停止更新定时器
+                if (this.progressInterval) {
+                    clearInterval(this.progressInterval);
+                    this.progressInterval = null;
+                }
+
+                // 隐藏进度条（带渐隐效果）
+                if (this.progressBar) {
+                    this.progressBar.classList.remove('show');
+                }
+
+                // 重置进度
+                if (this.progressFill) {
+                    this.progressFill.style.width = '100%';
                 }
             }
 
@@ -1956,23 +2071,49 @@
                     this.autoPlayTimer = null;
                 }
 
-                // 如果自动播放被禁用（值为100），不调度
-                if (this.autoPlayInterval >= 100) {
+                // 如果自动播放被禁用（值为30），不调度
+                if (this.autoPlayInterval >= 30) {
                     return;
                 }
 
-                // 如果没有下一个片段，不调度
                 const nextIndex = currentIndex + 1;
+                const currentSegment = this.segments[currentIndex];
+                // 片段总播放时长 = 单次播放时长 * 重复次数
+                const segmentTotalDuration = currentSegment.duration * this.repeatCount;
+                // 停顿时间 = autoPlayInterval * 片段时长
+                const pauseDuration = this.autoPlayInterval * currentSegment.duration;
+                // 总等待时间 = 片段播放时长 + 停顿时间
+                const waitTime = segmentTotalDuration + pauseDuration;
+
+                // 如果是最后一个片段，调度播放完成提示音
                 if (nextIndex >= this.segments.length) {
+                    console.log(`自动播放: 最后一个片段，等待 ${waitTime.toFixed(1)} 秒后播放完成提示音`);
+                    console.log(`  - 片段播放时长: ${segmentTotalDuration.toFixed(1)} 秒`);
+                    console.log(`  - 停顿时间: ${pauseDuration.toFixed(1)} 秒`);
+
+                    // 启动进度条，显示停顿倒计时
+                    setTimeout(() => {
+                        this.startProgressBar(pauseDuration);
+                    }, segmentTotalDuration * 1000);
+
+                    // 调度播放完成提示音
+                    this.autoPlayTimer = setTimeout(() => {
+                        this.playCompletionSound();
+                        // 停止进度条
+                        this.stopProgressBar();
+                    }, waitTime * 1000);
                     return;
                 }
-
-                // 计算等待时间：播放间隔 + 当前片段时长 × repeatCount
-                const currentSegment = this.segments[currentIndex];
-                const waitTime = this.autoPlayInterval === 0 ?
-                    1 : this.autoPlayInterval + currentSegment.duration * this.repeatCount;
 
                 console.log(`自动播放: 等待 ${waitTime.toFixed(1)} 秒后播放片段 ${nextIndex + 1}`);
+                console.log(`  - 片段播放时长: ${segmentTotalDuration.toFixed(1)} 秒`);
+                console.log(`  - 停顿时间: ${pauseDuration.toFixed(1)} 秒`);
+
+                // 启动进度条，显示停顿倒计时
+                // 进度条在片段播放完成后开始显示，时长为停顿时间
+                setTimeout(() => {
+                    this.startProgressBar(pauseDuration);
+                }, segmentTotalDuration * 1000);
 
                 // 调度下一个片段的播放
                 this.autoPlayTimer = setTimeout(() => {
@@ -2015,8 +2156,8 @@
                         }
                     }, 300);
 
-                    // 如果自动播放启用（值小于100），立即开始播放第一个片段
-                    if (this.autoPlayInterval < 100 && this.segments.length > 0) {
+                    // 如果自动播放启用（值小于30），立即开始播放第一个片段
+                    if (this.autoPlayInterval < 30 && this.segments.length > 0) {
                         console.log('自动播放已启用，立即播放第一个片段');
                         setTimeout(() => {
                             this.playNext();
@@ -2061,6 +2202,9 @@
                     this.autoPlayTimer = null;
                     console.log('自动播放定时器已清除');
                 }
+
+                // 停止进度条
+                this.stopProgressBar();
 
                 this.isVoiceControlActive = false;
                 this.isPausedForPlayback = false; // 重置暂停标志
@@ -2963,7 +3107,7 @@
 
                     // 如果不是最后一次播放，等待0.5秒
                     if (i < this.repeatCount - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         // 检查播放任务是否被取消
                         if (playbackId !== this.currentPlaybackId) return;
                     }
