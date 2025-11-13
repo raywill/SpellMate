@@ -161,7 +161,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ Playing audio, voice recognition paused...',
             
             commandsTitle: 'Available Commands:',
-            commandStart: 'Start - Begin dictation',
+            commandStart: 'Start - Play from first segment',
             commandNext: 'Next - Play next segment',
             commandReplay: 'Repeat - Replay current segment',
             commandPrevious: 'Previous - Play previous segment',
@@ -179,7 +179,7 @@ const i18n = {
             autoPlayShorter: 'Short',
             autoPlayModerate: 'Moderate',
             autoPlayLonger: 'Long',
-            autoPlayVeryLong: 'Very Long',
+            autoPlayVeryLong: 'Longer',
             autoPlayManual: 'Manual',
             autoPlayFast: 'Short',
             autoPlaySlow: 'Long',
@@ -248,7 +248,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ オーディオ再生中、音声認識を一時停止...',
             
             commandsTitle: '使用可能なコマンド：',
-            commandStart: '開始 - 聴写を開始',
+            commandStart: '開始 - 最初のセグメントから再生',
             commandNext: '次 - 次のセグメントを再生',
             commandReplay: '何 - 現在のセグメントを再生',
             commandPrevious: '前 - 前のセグメントを再生',
@@ -335,7 +335,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ Lecture audio, reconnaissance vocale en pause...',
             
             commandsTitle: 'Commandes disponibles :',
-            commandStart: 'Commencer - Démarrer la dictée',
+            commandStart: 'Commencer - Lire depuis le premier segment',
             commandNext: 'Suivant - Segment suivant',
             commandReplay: 'Répéter - Rejouer le segment',
             commandPrevious: 'Précédent - Segment précédent',
@@ -422,7 +422,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ Audio wird abgespielt, Spracherkennung pausiert...',
 
             commandsTitle: 'Verfügbare Befehle:',
-            commandStart: 'Start - Diktat beginnen',
+            commandStart: 'Start - Vom ersten Segment abspielen',
             commandNext: 'Weiter - Nächstes Segment',
             commandReplay: 'Wiederholen - Aktuelles Segment',
             commandPrevious: 'Zurück - Vorheriges Segment',
@@ -435,12 +435,12 @@ const i18n = {
             volumeLevelLoud: 'Laut',
             settingRepeatCount: 'Wiederholungen:',
             settingAutoPlay: 'Wiedergabeintervall:',
-            autoPlayContinuous: 'Kontinuierlich',
-            autoPlayVeryShorter: 'Sehr kurz',
+            autoPlayContinuous: 'Direkt',
+            autoPlayVeryShorter: 'S.kurz',
             autoPlayShorter: 'Kurz',
             autoPlayModerate: 'Mäßig',
             autoPlayLonger: 'Lang',
-            autoPlayVeryLong: 'Sehr lang',
+            autoPlayVeryLong: 'S.lang',
             autoPlayManual: 'Manuell',
             autoPlayFast: 'Kurz',
             autoPlaySlow: 'Lang',
@@ -509,7 +509,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ Reproduciendo audio, reconocimiento de voz pausado...',
 
             commandsTitle: 'Comandos disponibles:',
-            commandStart: 'Empezar - Iniciar dictado',
+            commandStart: 'Empezar - Reproducir desde el primer segmento',
             commandNext: 'Siguiente - Siguiente segmento',
             commandReplay: 'Repetir - Repetir segmento',
             commandPrevious: 'Anterior - Segmento anterior',
@@ -596,7 +596,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ 오디오 재생 중, 음성 인식 일시 정지...',
             
             commandsTitle: '사용 가능한 명령:',
-            commandStart: '시작 - 받아쓰기 시작',
+            commandStart: '시작 - 첫 번째 세그먼트부터 재생',
             commandNext: '다음 - 다음 세그먼트 재생',
             commandReplay: '반복 - 현재 세그먼트 재생',
             commandPrevious: '이전 - 이전 세그먼트 재생',
@@ -683,7 +683,7 @@ const i18n = {
             voiceControlPausedDetail: '⏸️ Воспроизведение аудио, распознавание речи приостановлено...',
 
             commandsTitle: 'Доступные команды:',
-            commandStart: 'Начать - Начать диктант',
+            commandStart: 'Начать - Воспроизвести с первого сегмента',
             commandNext: 'Далее - Следующий сегмент',
             commandReplay: 'Повтор - Повторить текущий сегмент',
             commandPrevious: 'Назад - Предыдущий сегмент',
@@ -696,12 +696,12 @@ const i18n = {
             volumeLevelLoud: 'Громко',
             settingRepeatCount: 'Повторы:',
             settingAutoPlay: 'Интервал воспроизведения:',
-            autoPlayContinuous: 'Непрерывный',
-            autoPlayVeryShorter: 'Очень короткий',
+            autoPlayContinuous: 'Сразу',
+            autoPlayVeryShorter: 'Оч.кор.',
             autoPlayShorter: 'Короткий',
-            autoPlayModerate: 'Умеренный',
+            autoPlayModerate: 'Средний',
             autoPlayLonger: 'Длинный',
-            autoPlayVeryLong: 'Очень длинный',
+            autoPlayVeryLong: 'Оч.длин.',
             autoPlayManual: 'Вручную',
             autoPlayFast: 'Короткий',
             autoPlaySlow: 'Длинный',
@@ -749,43 +749,51 @@ const i18n = {
     // 语音命令配置（每种语言的关键词）
     voiceCommands: {
         zh: {
+            start: ['开始', '重新开始', '从头开始', '从第一个开始'],
             next: ['好', '好了', '好啦', '好咯', 'ok', '下一个', '下一条', '下一题', '好的', '写好了', '继续', '下一句', '对了', '完成', '知道了'],
-            replay: ['什么', '啥', '开始', '重播', '再说一遍', '再来一次', '没听清', '再听', '听不清', '重复', '重来'],
+            replay: ['什么', '啥', '重播', '再说一遍', '再来一次', '没听清', '再听', '听不清', '重复', '重来'],
             previous: ['上一个', '上一题', '回退', '返回', '上一句', '前一个']
         },
         en: {
+            start: ['start', 'restart', 'begin', 'from start', 'from beginning'],
             next: ['ok', 'okay', 'good', 'next', 'continue', 'done', 'yes'],
-            replay: ['what', 'start', 'repeat', 'again', 'replay', 'pardon'],
+            replay: ['what', 'repeat', 'again', 'replay', 'pardon'],
             previous: ['previous', 'back', 'before', 'last']
         },
         ja: {
+            start: ['開始', '最初から', '始めから'],
             next: ['はい', 'いい', '次', 'つぎ', '続き', '完了', 'ok'],
-            replay: ['何', 'なに', '開始', 'もう一度', '繰り返し'],
+            replay: ['何', 'なに', 'もう一度', '繰り返し'],
             previous: ['前', 'まえ', '戻る', '前回']
         },
         fr: {
+            start: ['commencer', 'recommencer', 'début', 'du début'],
             next: ['ok', 'bien', 'suivant', 'continuer', 'terminé', 'oui'],
-            replay: ['quoi', 'commencer', 'répéter', 'encore'],
+            replay: ['quoi', 'répéter', 'encore'],
             previous: ['précédent', 'retour', 'avant']
         },
         de: {
+            start: ['start', 'neustart', 'anfang', 'von anfang'],
             next: ['ok', 'gut', 'weiter', 'nächste', 'fertig', 'ja'],
-            replay: ['was', 'start', 'wiederholen', 'nochmal'],
+            replay: ['was', 'wiederholen', 'nochmal'],
             previous: ['zurück', 'vorherige', 'vorher']
         },
         es: {
+            start: ['empezar', 'reiniciar', 'comenzar', 'desde el inicio'],
             next: ['ok', 'bien', 'siguiente', 'continuar', 'listo', 'sí'],
-            replay: ['qué', 'empezar', 'repetir', 'otra vez'],
+            replay: ['qué', 'repetir', 'otra vez'],
             previous: ['anterior', 'atrás', 'volver']
         },
         ko: {
+            start: ['시작', '처음부터', '다시 시작'],
             next: ['좋아', '좋아요', '다음', '계속', '완료', '네', 'ok', '오케이'],
-            replay: ['뭐', '뭐라고', '시작', '다시', '반복', '한번더'],
+            replay: ['뭐', '뭐라고', '다시', '반복', '한번더'],
             previous: ['이전', '앞으로', '뒤로', '전으로']
         },
         ru: {
+            start: ['начать', 'перезапустить', 'сначала', 'с начала'],
             next: ['хорошо', 'ок', 'далее', 'следующий', 'продолжить', 'готово', 'да'],
-            replay: ['что', 'начать', 'повтор', 'повторить', 'ещё раз', 'не слышу'],
+            replay: ['что', 'повтор', 'повторить', 'ещё раз', 'не слышу'],
             previous: ['назад', 'предыдущий', 'вернуться']
         }
     },
